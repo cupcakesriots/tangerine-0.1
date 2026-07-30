@@ -1,8 +1,9 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { AppLayout } from "~/components/AppLayout"
 import { NectarMeter } from "~/components/NectarMeter";
 import { GuidedSession, type SessionType } from "~/components/wellness";
+import { usePremium } from "~/lib/premium";
 import {
   isOnboardingComplete,
   getWellnessEntries,
@@ -11,6 +12,14 @@ import {
   generateId,
   type WellnessEntry,
 } from "~/lib/storage";
+import {
+  getFitnessSettings,
+  getFitnessSummary,
+  getCorrelationInsight,
+  PROVIDER_LABELS,
+  type FitnessSummary,
+  type CorrelationInsight,
+} from "~/lib/fitnessSync";
 
 export const Route = createFileRoute("/wellness")({
   component: WellnessPage,
@@ -118,6 +127,7 @@ const premiumSessions: { type: SessionType; emoji: string; title: string; durati
 
 function WellnessPage() {
   const navigate = useNavigate();
+  const premium = usePremium();
   const [ready, setReady] = useState(false);
   const [energyLevel, setEnergyLevel] = useState(3);
   const [moods, setMoods] = useState<string[]>([]);
@@ -127,6 +137,8 @@ function WellnessPage() {
   const [activeActivity, setActiveActivity] = useState<ActivityType | null>(null);
   const [activeSession, setActiveSession] = useState<SessionType | null>(null);
   const [history, setHistory] = useState<WellnessEntry[]>([]);
+  const [fitnessSummary, setFitnessSummary] = useState<FitnessSummary | null>(null);
+  const [correlationInsight, setCorrelationInsight] = useState<CorrelationInsight | null>(null);
 
   useEffect(() => {
     if (!isOnboardingComplete()) {
@@ -135,6 +147,8 @@ function WellnessPage() {
     }
     setTodaysEntry(getTodaysWellness());
     setHistory(getWellnessEntries().slice(-7).reverse());
+    setFitnessSummary(getFitnessSummary());
+    setCorrelationInsight(getCorrelationInsight());
     setReady(true);
   }, []);
 
@@ -446,6 +460,62 @@ function WellnessPage() {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* ── Fitness Tracker Summary ── */}
+        {fitnessSummary && fitnessSummary.today ? (
+          <div className="card border-brand-light/20 bg-gradient-to-br from-brand-warm/10 to-brand-cream/10">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="font-serif text-base font-medium text-brand-dark">Today's movement</h2>
+              <span className="text-[10px] text-brand-muted">
+                {fitnessSummary.provider ? `Data from ${PROVIDER_LABELS[fitnessSummary.provider]}` : ""}
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              {[
+                { label: "Steps", value: fitnessSummary.today.steps, max: 10000, fmt: (v: number) => v >= 1000 ? `${Math.round(v / 1000)}k` : `${v}` },
+                { label: "Active min", value: fitnessSummary.today.activeMinutes, max: 60, fmt: (v: number) => `${v}` },
+                { label: "Sleep hrs", value: fitnessSummary.today.sleepHours, max: 10, fmt: (v: number) => `${v}` },
+              ].map(({ label, value, max, fmt }) => (
+                <div key={label} className="text-center">
+                  <div className="relative mx-auto mb-1.5 flex h-16 w-16 items-center justify-center">
+                    <svg className="h-full w-full -rotate-90" viewBox="0 0 36 36">
+                      <circle cx="18" cy="18" r="15" fill="none" stroke="#f0e6d8" strokeWidth="4" />
+                      <circle cx="18" cy="18" r="15" fill="none" stroke="#c26b01" strokeWidth="4" strokeLinecap="round"
+                        strokeDasharray={`${Math.min(value / max * 94, 94)} 94`} />
+                    </svg>
+                    <span className="absolute text-sm font-semibold text-brand-dark">{fmt(value)}</span>
+                  </div>
+                  <p className="text-xs font-medium text-brand-dark">{label}</p>
+                </div>
+              ))}
+            </div>
+            <Link to="/settings/fitness" className="mt-3 inline-block text-xs text-brand-deep hover:underline">
+              Manage fitness sync →
+            </Link>
+          </div>
+        ) : premium.isPremium && !getFitnessSettings().connected ? (
+          <Link to="/settings/fitness" className="card block border-dashed border-brand-light/40 bg-brand-cream/10 transition-all hover:border-brand-light hover:bg-brand-cream/20">
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-warm/30 text-xl">❤️</div>
+              <div>
+                <h3 className="font-serif text-base font-medium text-brand-dark">Connect your fitness tracker</h3>
+                <p className="text-sm text-brand-muted leading-relaxed">See your steps, sleep, and activity alongside your energy check-ins — a fuller picture of your day.</p>
+              </div>
+              <span className="shrink-0 text-brand-muted">→</span>
+            </div>
+          </Link>
+        ) : null}
+
+        {/* ── Energy-Fitness Correlation Insight ── */}
+        {premium.isPremium && correlationInsight && history.length >= 3 && (
+          <div className="card border-brand-light/20 bg-gradient-to-br from-brand-cream/20 to-brand-warm/10">
+            <p className="text-xs font-medium uppercase tracking-wider text-brand-muted/60 mb-2">Energy & Movement</p>
+            <p className="text-sm text-brand-dark leading-relaxed italic">"{correlationInsight.text}"</p>
+            {correlationInsight.type === "insufficient-data" && (
+              <p className="mt-2 text-xs text-brand-muted">These aren't prescriptions — just gentle patterns to notice, if they're useful to you.</p>
+            )}
           </div>
         )}
       </div>
