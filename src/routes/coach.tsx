@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { AppLayout } from "~/components/AppLayout";
-import { FocusTimerCard, TaskRescheduleCard, TaskCreatorCard } from "~/components/CoachActions";
+import { FocusTimerCard, TaskRescheduleCard, TaskCreatorCard, SmartRescheduleCard } from "~/components/CoachActions";
 import {
   isOnboardingComplete,
   getCoachMessages,
@@ -14,6 +14,7 @@ import {
   generateId,
   type CoachMessage,
   type Subtask,
+  type SmartRescheduleTask,
 } from "~/lib/storage";
 
 export const Route = createFileRoute("/coach")({
@@ -144,6 +145,85 @@ for (const seg of segments) {
   items.push({ name: s, priority });
 }
 return items;
+}
+
+// ── Smart Reschedule Analysis ──
+function buildSmartRescheduleResponse(id: string, now: string, todayTasks: any[], allActiveTasks: any[]): CoachMessage {
+const taskIds = new Set(todayTasks.map(t => t.id));
+
+// Build dependency graph: which tasks block others
+const blockedBy: Record<string, string[]> = {}; // taskId -> ids of tasks that block it
+const blocksOthers: Record<string, string[]> = {}; // taskId -> ids of tasks it blocks
+for (const task of allActiveTasks) {
+  if (task.dependencies && task.dependencies.length > 0) {
+    for (const depId of task.dependencies) {
+      if (!blockedBy[task.id]) blockedBy[task.id] = [];
+      blockedBy[task.id].push(depId);
+      if (!blocksOthers[depId]) blocksOthers[depId] = [];
+      blocksOthers[depId].push(task.id);
+    }
+  }
+}
+
+const analyzed: SmartRescheduleTask[] = todayTasks.map(task => {
+  const blocks = (blocksOthers[task.id] || []).filter(depId => taskIds.has(depId));
+  const blocked = (blockedBy[task.id] || []).some(depId => taskIds.has(depId));
+  const effort = task.energyRequired || 3;
+
+  // Build reasoning
+  const parts: string[] = [];
+  if (task.priority === "low") parts.push("low priority");
+  else if (task.priority === "medium") parts.push("medium priority");
+  else parts.push("high priority");
+
+  if (blocks.length > 0) parts.push(`blocks ${blocks.length} task${blocks.length > 1 ? "s" : ""}`);
+  else parts.push("no dependents");
+
+  if (task.recurring) parts.push("recurring");
+  if (task.dependencies && task.dependencies.length > 0) parts.push("has dependencies");
+
+  // Keep reason for high-priority or blocking tasks
+  let keepReason: string | undefined;
+  if (task.priority === "high") keepReason = "high priority — should stay today";
+  else if (blocks.length > 0) keepReason = `blocks other task${blocks.length > 1 ? "s" : ""} — keep for now`;
+
+  // Best candidates to move: low priority, not blocking, low effort
+  const isBestCandidate = task.priority === "low" && blocks.length === 0;
+
+  return {
+    id: task.id,
+    name: task.name,
+    priority: task.priority,
+    effort,
+    isRecurring: task.recurring || false,
+    blocksOthers: blocks.length > 0,
+    isBlocked: blocked,
+    reason: parts.join(", "),
+    keepReason,
+    selected: isBestCandidate, // pre-select low-priority non-blocking
+  };
+});
+
+const selectedCount = analyzed.filter(t => t.selected).length;
+const totalCount = analyzed.length;
+
+let content: string;
+if (totalCount >= 5) {
+  content = `You have ${totalCount} tasks today. I've looked through them and found ${selectedCount} that could move to create some breathing room. Here's what I suggest:`;
+} else if (totalCount >= 3) {
+  content = `${totalCount} tasks today — let's look at what could shift to make the day feel lighter:`;
+} else {
+  content = "Here are your tasks for today. Let's see if anything feels like it could wait:";
+}
+
+return {
+  id, role: "coach", timestamp: now, type: "smart-reschedule",
+  content,
+  data: {
+    analyzedTasks: analyzed,
+    suggestedDestination: "tomorrow",
+  },
+};
 }
 
 // ── Smart Response Engine ──
@@ -278,6 +358,17 @@ function generateCoachResponse(userMessage: string, ctx: CoachContext): CoachMes
         category: "procrastination",
       },
     };
+  }
+
+  // ── Overwhelm + Tasks → Smart Reschedule (before general overwhelm, when there are tasks to analyze) ──
+  if (lower.includes("overwhelm") || lower.includes("too much") || lower.includes("too many") || lower.includes("drowning")) {
+    const today = new Date().toISOString().split("T")[0];
+    const activeTasks = getTasks().filter(t => t.status === "active");
+    const todayTasks = activeTasks.filter(t => t.date === today);
+    if (todayTasks.length >= 3) {
+      return buildSmartRescheduleResponse(id, now, todayTasks, activeTasks);
+    }
+    // fall through to general overwhelm below
   }
 
   // ── Overwhelm → Decision Tree or Subtask Breakdown ──
@@ -437,49 +528,25 @@ function generateCoachResponse(userMessage: string, ctx: CoachContext): CoachMes
     };
   }
 
-  // ── Task Reschedule → Direct date-modification card ──
+  // ── Smart Reschedule → Task-aware analysis with checkboxes, dependency chains, destination picker ──
   if (
     lower.includes("reschedule") || lower.includes("postpone") || lower.includes("move task") ||
     lower.includes("push to tomorrow") || lower.includes("too many today") || lower.includes("clear today") ||
-    lower.includes("move to next week") || lower.includes("defer") || lower.includes("not today")
+    lower.includes("move to next week") || lower.includes("defer") || lower.includes("not today") ||
+    lower.includes("lighten my day") || lower.includes("help me reschedule") || lower.includes("breathing room") ||
+    lower.includes("too many tasks")
   ) {
+    const today = new Date().toISOString().split("T")[0];
     const activeTasks = getTasks().filter(t => t.status === "active");
-    const todayTasks = activeTasks.filter(t => t.date === new Date().toISOString().split("T")[0]);
-    const nonUrgentToday = todayTasks.filter(t => t.priority !== "high");
+    const todayTasks = activeTasks.filter(t => t.date === today);
 
-    if (nonUrgentToday.length > 0) {
-      return {
-        id, role: "coach", timestamp: now, type: "task-reschedule",
-        content: `You have ${nonUrgentToday.length} non-urgent task${nonUrgentToday.length > 1 ? "s" : ""} scheduled for today. Moving them can create breathing room:`,
-        data: {
-          rescheduleAction: "move-to-tomorrow",
-          affectedTaskCount: nonUrgentToday.length,
-          affectedTasks: nonUrgentToday.map(t => ({ id: t.id, name: t.name, oldDate: t.date })),
-        },
-      };
+    if (todayTasks.length > 0) {
+      return buildSmartRescheduleResponse(id, now, todayTasks, activeTasks);
     }
-
-    if (todayTasks.length > 3) {
-      return {
-        id, role: "coach", timestamp: now, type: "task-reschedule",
-        content: `You have ${todayTasks.length} tasks today. If you're feeling overloaded, would you like to lighten the load?`,
-        data: {
-          rescheduleAction: "clear-low-priority",
-          affectedTaskCount: todayTasks.filter(t => t.priority === "low").length,
-          affectedTasks: todayTasks.filter(t => t.priority === "low").map(t => ({ id: t.id, name: t.name, oldDate: t.date })),
-        },
-      };
-    }
-
-    // Fallback: offer general reschedule
+    // No tasks today — gentle redirect
     return {
-      id, role: "coach", timestamp: now, type: "task-reschedule",
-      content: "Sometimes the kindest thing you can do is give yourself more time. Would you like to reschedule any tasks?",
-      data: {
-        rescheduleAction: "move-to-tomorrow",
-        affectedTaskCount: todayTasks.length,
-        affectedTasks: todayTasks.map(t => ({ id: t.id, name: t.name, oldDate: t.date })),
-      },
+      id, role: "coach", timestamp: now, type: "chat",
+      content: "It looks like you don't have any tasks scheduled for today. Maybe that's exactly what you need — a clean slate. If you'd like to plan a few things, I'm here.",
     };
   }
 
@@ -837,6 +904,8 @@ function CoachMessageBubble({ msg, onResponse }: { msg: CoachMessage; onResponse
       return <FocusTimerCard msg={msg} onResponse={onResponse} />;
     case "task-reschedule":
       return <TaskRescheduleCard msg={msg} onResponse={onResponse} />;
+    case "smart-reschedule":
+      return <SmartRescheduleCard msg={msg} onResponse={onResponse} />;
     case "task-creator":
       return <TaskCreatorCard msg={msg} onResponse={onResponse} />;
     default:
