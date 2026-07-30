@@ -2,6 +2,12 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { AppLayout } from "~/components/AppLayout";
 import { isOnboardingComplete, getTasks, type Task } from "~/lib/storage";
+import {
+  getCalendarSyncState,
+  getEventsForDate,
+  formatEventTime,
+  type CalendarEvent,
+} from "~/lib/calendarSync";
 
 export const Route = createFileRoute("/calendar")({
   component: CalendarPage,
@@ -10,6 +16,12 @@ export const Route = createFileRoute("/calendar")({
 type ViewMode = "week" | "day" | "agenda" | "month";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+const EVENT_SOURCE_COLORS: Record<string, string> = {
+  google: "#4285F4",
+  demo: "#9333EA",
+  tangerine: "#da9202",
+};
 
 function CalendarPage() {
   const navigate = useNavigate();
@@ -24,6 +36,10 @@ function CalendarPage() {
   });
   const [tasks, setTasks] = useState<Task[]>([]);
   const [ready, setReady] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+
+  const syncState = getCalendarSyncState();
+  const hasSync = syncState.syncStatus === "synced" || syncState.demoMode;
 
   useEffect(() => {
     if (!isOnboardingComplete()) {
@@ -73,6 +89,22 @@ function CalendarPage() {
     return tasks.filter((t) => t.date === formatDate(date) && t.status !== "completed");
   };
 
+  const getCalendarEventsForDate = (date: Date): CalendarEvent[] => {
+    if (!hasSync) return [];
+    return getEventsForDate(formatDate(date));
+  };
+
+  const getAllItemsForDate = (date: Date) => {
+    const taskItems = getTasksForDate(date);
+    const eventItems = getCalendarEventsForDate(date);
+    // Combine and sort: calendar events (with times) first, then tasks
+    const combined: Array<{ type: "task"; data: Task } | { type: "event"; data: CalendarEvent }> = [
+      ...eventItems.map((e) => ({ type: "event" as const, data: e })),
+      ...taskItems.map((t) => ({ type: "task" as const, data: t })),
+    ];
+    return combined;
+  };
+
   const navigateWeek = (dir: number) => {
     const newStart = new Date(weekStart);
     newStart.setDate(newStart.getDate() + dir * 7);
@@ -103,11 +135,12 @@ function CalendarPage() {
 
   const renderAgendaView = () => {
     const weekDates = getWeekDates();
+    const hasAnyItems = weekDates.some((d) => getAllItemsForDate(d).length > 0);
     return (
       <div className="space-y-3">
         {weekDates.map((date) => {
-          const dayTasks = getTasksForDate(date);
-          if (dayTasks.length === 0) return null;
+          const items = getAllItemsForDate(date);
+          if (items.length === 0) return null;
           return (
             <div key={formatDate(date)} className="card">
               <h3 className={`mb-2 font-serif text-base font-medium ${isToday(date) ? "text-brand-deep" : "text-brand-dark"}`}>
@@ -115,20 +148,26 @@ function CalendarPage() {
                 {isToday(date) && <span className="ml-2 text-xs text-brand-deep">· Today</span>}
               </h3>
               <div className="space-y-1.5">
-                {dayTasks.map((task) => (
-                  <div key={task.id} className="flex items-center gap-2 rounded-lg bg-brand-cream/20 px-3 py-2">
-                    <span className={`h-2 w-2 shrink-0 rounded-full ${task.priority === "high" ? "bg-red-400" : task.priority === "medium" ? "bg-amber-400" : "bg-green-400"}`} />
-                    <span className="flex-1 text-sm text-brand-dark">{task.name}</span>
-                    <span className="text-xs text-brand-muted">{task.projectType}</span>
-                  </div>
-                ))}
+                {items.map((item) =>
+                  item.type === "event" ? (
+                    <CalendarEventRow key={item.data.id} event={item.data} onClick={setSelectedEvent} />
+                  ) : (
+                    <div key={item.data.id} className="flex items-center gap-2 rounded-lg bg-brand-cream/20 px-3 py-2">
+                      <span className={`h-2 w-2 shrink-0 rounded-full ${
+                        item.data.priority === "high" ? "bg-red-400" : item.data.priority === "medium" ? "bg-amber-400" : "bg-green-400"
+                      }`} />
+                      <span className="flex-1 text-sm text-brand-dark">{item.data.name}</span>
+                      <span className="text-xs text-brand-muted">{item.data.projectType}</span>
+                    </div>
+                  )
+                )}
               </div>
             </div>
           );
         })}
-        {weekDates.every((d) => getTasksForDate(d).length === 0) && (
+        {!hasAnyItems && (
           <div className="card py-8 text-center">
-            <p className="text-brand-muted">No tasks this week. Enjoy the open space! 🌿</p>
+            <p className="text-brand-muted">No tasks or events this week. Enjoy the open space! 🌿</p>
           </div>
         )}
       </div>
@@ -197,29 +236,37 @@ function CalendarPage() {
           <div className="space-y-4">
             {getWeekDates()
               .filter((_, i) => i === 0)
-              .map((date) => (
+              .map((date) => {
+                const items = getAllItemsForDate(date);
+                return (
                 <div key={formatDate(date)} className="card">
                   <h3 className={`mb-3 font-serif text-lg font-medium ${isToday(date) ? "text-brand-deep" : "text-brand-dark"}`}>
                     {date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
                     {isToday(date) && <span className="ml-2 text-sm text-brand-light">· Today</span>}
                   </h3>
                   <div className="space-y-2">
-                    {getTasksForDate(date).length === 0 ? (
+                    {items.length === 0 ? (
                       <p className="py-4 text-center text-sm text-brand-muted">A blank canvas day. What would feel good?</p>
                     ) : (
-                      getTasksForDate(date).map((task) => (
-                        <div key={task.id} className="flex items-center gap-3 rounded-xl border border-brand-cream/40 px-4 py-3">
-                          <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${task.priority === "high" ? "bg-red-400" : task.priority === "medium" ? "bg-amber-400" : "bg-green-400"}`} />
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-brand-dark">{task.name}</p>
-                            <p className="text-xs text-brand-muted">{task.projectType} · {task.energyRequired ? '⚡'.repeat(task.energyRequired) : ''}</p>
+                      items.map((item) =>
+                        item.type === "event" ? (
+                          <CalendarEventRow key={item.data.id} event={item.data} onClick={setSelectedEvent} expanded />
+                        ) : (
+                          <div key={item.data.id} className="flex items-center gap-3 rounded-xl border border-brand-cream/40 px-4 py-3">
+                            <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${
+                              item.data.priority === "high" ? "bg-red-400" : item.data.priority === "medium" ? "bg-amber-400" : "bg-green-400"
+                            }`} />
+                            <div className="flex-1">
+                              <p className="text-sm font-medium text-brand-dark">{item.data.name}</p>
+                              <p className="text-xs text-brand-muted">{item.data.projectType} · {item.data.energyRequired ? '⚡'.repeat(item.data.energyRequired) : ''}</p>
+                            </div>
                           </div>
-                        </div>
-                      ))
+                        )
+                      )
                     )}
                   </div>
                 </div>
-              ))}
+              )})}
           </div>
         )}
 
@@ -227,7 +274,9 @@ function CalendarPage() {
         {view === "week" && (
           <div className="grid grid-cols-7 gap-2">
             {getWeekDates().map((date) => {
-              const dayTasks = getTasksForDate(date);
+              const items = getAllItemsForDate(date);
+              const dayEvents = items.filter((i) => i.type === "event");
+              const dayTasks = items.filter((i) => i.type === "task");
               return (
                 <div key={formatDate(date)} className="min-h-[120px]">
                   <div className={`mb-1 text-center text-xs font-medium ${isToday(date) ? "text-brand-deep" : "text-brand-muted"}`}>
@@ -237,22 +286,44 @@ function CalendarPage() {
                     </div>
                   </div>
                   <div className="space-y-1">
-                    {dayTasks.slice(0, 3).map((task) => (
-                      <div
-                        key={task.id}
-                        className={`truncate rounded-md px-1.5 py-1 text-[10px] font-medium ${
-                          task.priority === "high"
-                            ? "bg-red-50 text-red-600"
-                            : task.priority === "medium"
-                              ? "bg-amber-50 text-amber-700"
-                              : "bg-green-50 text-green-700"
-                        }`}
-                      >
-                        {task.name}
-                      </div>
-                    ))}
-                    {dayTasks.length > 3 && (
-                      <p className="text-center text-[10px] text-brand-muted">+{dayTasks.length - 3} more</p>
+                    {/* Calendar events first */}
+                    {dayEvents.map((item) => {
+                      const ev = item.data as CalendarEvent;
+                      return (
+                        <div
+                          key={ev.id}
+                          className="cursor-pointer truncate rounded-md px-1.5 py-1 text-[10px] font-medium"
+                          style={{
+                            backgroundColor: (ev.color || EVENT_SOURCE_COLORS[ev.source] || "#9333EA") + "18",
+                            color: ev.color || EVENT_SOURCE_COLORS[ev.source] || "#9333EA",
+                          }}
+                          onClick={() => setSelectedEvent(ev)}
+                        >
+                          <span className="mr-0.5 text-[8px]">📅</span>
+                          {ev.startTime ? `${ev.startTime} ` : ""}{ev.title}
+                        </div>
+                      );
+                    })}
+                    {/* Tasks */}
+                    {dayTasks.slice(0, Math.max(3 - dayEvents.length, 1)).map((item) => {
+                      const t = item.data as Task;
+                      return (
+                        <div
+                          key={t.id}
+                          className={`truncate rounded-md px-1.5 py-1 text-[10px] font-medium ${
+                            t.priority === "high"
+                              ? "bg-red-50 text-red-600"
+                              : t.priority === "medium"
+                                ? "bg-amber-50 text-amber-700"
+                                : "bg-green-50 text-green-700"
+                          }`}
+                        >
+                          {t.name}
+                        </div>
+                      );
+                    })}
+                    {items.length > 3 && (
+                      <p className="text-center text-[10px] text-brand-muted">+{items.length - 3} more</p>
                     )}
                   </div>
                 </div>
@@ -273,7 +344,9 @@ function CalendarPage() {
             </div>
             <div className="grid grid-cols-7 gap-2">
               {getMonthDates().map((date) => {
-                const dayTasks = getTasksForDate(date);
+                const items = getAllItemsForDate(date);
+                const dayEvents = items.filter((i) => i.type === "event");
+                const dayTasks = items.filter((i) => i.type === "task");
                 const isCurrentMonth = date.getMonth() === weekStart.getMonth();
                 return (
                   <div
@@ -290,30 +363,48 @@ function CalendarPage() {
                       {date.getDate()}
                     </div>
                     <div className="space-y-0.5">
-                      {dayTasks.slice(0, 2).map((task) => (
+                      {dayEvents.slice(0, 1).map((item) => {
+                        const ev = item.data as CalendarEvent;
+                        return (
+                          <div
+                            key={ev.id}
+                            className="cursor-pointer truncate rounded px-1 py-0.5 text-[10px] font-medium"
+                            style={{
+                              backgroundColor: (ev.color || EVENT_SOURCE_COLORS[ev.source] || "#9333EA") + "18",
+                              color: ev.color || EVENT_SOURCE_COLORS[ev.source] || "#9333EA",
+                            }}
+                            onClick={() => setSelectedEvent(ev)}
+                          >
+                            📅 {ev.title}
+                          </div>
+                        );
+                      })}
+                      {dayTasks.slice(0, Math.max(2 - dayEvents.length, 1)).map((item) => {
+                        const t = item.data as Task;
+                        return (
                         <div
-                          key={task.id}
+                          key={t.id}
                           className="truncate rounded px-1 py-0.5 text-[10px] font-medium"
                           style={{
                             backgroundColor:
-                              task.priority === "high"
+                              t.priority === "high"
                                 ? "#fef2f2"
-                                : task.priority === "medium"
+                                : t.priority === "medium"
                                   ? "#fffbeb"
                                   : "#f0fdf4",
                             color:
-                              task.priority === "high"
+                              t.priority === "high"
                                 ? "#dc2626"
-                                : task.priority === "medium"
+                                : t.priority === "medium"
                                   ? "#d97706"
                                   : "#16a34a",
                           }}
                         >
-                          {task.name}
+                          {t.name}
                         </div>
-                      ))}
-                      {dayTasks.length > 2 && (
-                        <p className="text-center text-[9px] text-brand-muted">+{dayTasks.length - 2}</p>
+                      )})}
+                      {items.length > 2 && (
+                        <p className="text-center text-[9px] text-brand-muted">+{items.length - 2}</p>
                       )}
                     </div>
                   </div>
@@ -322,7 +413,147 @@ function CalendarPage() {
             </div>
           </div>
         )}
+
+        {/* ===== EVENT DETAIL MODAL ===== */}
+        {selectedEvent && (
+          <EventDetailModal
+            event={selectedEvent}
+            onClose={() => setSelectedEvent(null)}
+          />
+        )}
       </div>
     </AppLayout>
+  );
+}
+
+/* ===== CALENDAR EVENT ROW ===== */
+function CalendarEventRow({
+  event,
+  onClick,
+  expanded = false,
+}: {
+  event: CalendarEvent;
+  onClick: (event: CalendarEvent) => void;
+  expanded?: boolean;
+}) {
+  return (
+    <div
+      className={`flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 transition-all hover:shadow-sm ${
+        expanded ? "border border-brand-cream/40" : ""
+      }`}
+      style={{
+        backgroundColor: (event.color || EVENT_SOURCE_COLORS[event.source] || "#9333EA") + "10",
+        borderLeft: expanded ? `3px solid ${event.color || EVENT_SOURCE_COLORS[event.source] || "#9333EA"}` : undefined,
+      }}
+      onClick={() => onClick(event)}
+    >
+      <span className="shrink-0 text-xs">📅</span>
+      <div className="min-w-0 flex-1">
+        <p className={`text-sm font-medium text-brand-dark ${expanded ? "" : "truncate"}`}>
+          {event.title}
+          {event.readOnly && <span className="ml-1 text-[10px] text-brand-muted/60">🔒</span>}
+        </p>
+        {expanded && event.description && (
+          <p className="mt-0.5 text-xs text-brand-muted">{event.description}</p>
+        )}
+        <p className="text-xs text-brand-muted/60">
+          {event.startTime && formatEventTime(event)}
+          {event.location && ` · 📍 ${event.location}`}
+        </p>
+      </div>
+      {event.source !== "tangerine" && (
+        <span className="shrink-0 rounded-full bg-brand-cream/60 px-1.5 py-0.5 text-[10px] font-medium text-brand-muted">
+          {event.source === "demo" ? "Demo" : "GCal"}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/* ===== EVENT DETAIL MODAL ===== */
+function EventDetailModal({
+  event,
+  onClose,
+}: {
+  event: CalendarEvent;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/10 backdrop-blur-sm sm:items-center" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="w-full max-w-md rounded-t-2xl bg-white/95 p-6 shadow-xl backdrop-blur-2xl sm:rounded-2xl slide-up" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span
+              className="h-3 w-3 rounded-full"
+              style={{ backgroundColor: event.color || EVENT_SOURCE_COLORS[event.source] || "#9333EA" }}
+            />
+            <h2 className="font-serif text-xl font-semibold text-brand-dark">{event.title}</h2>
+          </div>
+          <button onClick={onClose} className="btn-ghost p-1">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          {event.readOnly && (
+            <div className="rounded-xl bg-brand-warm/20 px-4 py-2">
+              <p className="text-xs font-medium text-brand-muted">
+                🔒 This event is synced from Google Calendar and is read-only in Tangerine.
+              </p>
+            </div>
+          )}
+
+          {event.description && (
+            <div>
+              <p className="text-xs font-medium text-brand-muted/60 mb-1">Description</p>
+              <p className="text-sm text-brand-dark">{event.description}</p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <p className="text-xs font-medium text-brand-muted/60 mb-0.5">Date</p>
+              <p className="text-sm text-brand-dark">
+                {new Date(event.startDate + "T00:00:00").toLocaleDateString("en-US", {
+                  weekday: "long",
+                  month: "long",
+                  day: "numeric",
+                })}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-medium text-brand-muted/60 mb-0.5">Time</p>
+              <p className="text-sm text-brand-dark">{event.startTime ? formatEventTime(event) : "All day"}</p>
+            </div>
+          </div>
+
+          {event.location && (
+            <div>
+              <p className="text-xs font-medium text-brand-muted/60 mb-0.5">Location</p>
+              <p className="text-sm text-brand-dark">📍 {event.location}</p>
+            </div>
+          )}
+
+          {event.attendees && event.attendees.length > 0 && (
+            <div>
+              <p className="text-xs font-medium text-brand-muted/60 mb-0.5">Attendees</p>
+              <div className="flex flex-wrap gap-1.5">
+                {event.attendees.map((a) => (
+                  <span key={a} className="rounded-full bg-brand-cream/30 px-2.5 py-0.5 text-xs text-brand-dark">
+                    {a}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 pt-2">
+            <span className="rounded-full bg-brand-cream/50 px-2.5 py-0.5 text-xs font-medium text-brand-muted">
+              {event.source === "demo" ? "Demo Event" : event.source === "google" ? "Google Calendar" : "Tangerine Task"}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

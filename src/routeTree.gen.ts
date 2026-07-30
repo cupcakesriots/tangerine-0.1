@@ -17,6 +17,7 @@ import { Route as CalendarRouteImport } from './routes/calendar'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SettingsIntegrationsRouteImport } from './routes/settings.integrations'
 import { Route as SettingsFitnessRouteImport } from './routes/settings.fitness'
+import { Route as SettingsCalendarRouteImport } from './routes/settings.calendar'
 
 const WellnessRoute = WellnessRouteImport.update({
   id: '/wellness',
@@ -58,6 +59,11 @@ const SettingsFitnessRoute = SettingsFitnessRouteImport.update({
   path: '/settings/fitness',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsCalendarRoute = SettingsCalendarRouteImport.update({
+  id: '/settings/calendar',
+  path: '/settings/calendar',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -66,6 +72,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRoute
   '/tasks': typeof TasksRoute
   '/wellness': typeof WellnessRoute
+  '/settings/calendar': typeof SettingsCalendarRoute
   '/settings/fitness': typeof SettingsFitnessRoute
   '/settings/integrations': typeof SettingsIntegrationsRoute
 }
@@ -76,6 +83,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardRoute
   '/tasks': typeof TasksRoute
   '/wellness': typeof WellnessRoute
+  '/settings/calendar': typeof SettingsCalendarRoute
   '/settings/fitness': typeof SettingsFitnessRoute
   '/settings/integrations': typeof SettingsIntegrationsRoute
 }
@@ -87,6 +95,7 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRoute
   '/tasks': typeof TasksRoute
   '/wellness': typeof WellnessRoute
+  '/settings/calendar': typeof SettingsCalendarRoute
   '/settings/fitness': typeof SettingsFitnessRoute
   '/settings/integrations': typeof SettingsIntegrationsRoute
 }
@@ -99,6 +108,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/tasks'
     | '/wellness'
+    | '/settings/calendar'
     | '/settings/fitness'
     | '/settings/integrations'
   fileRoutesByTo: FileRoutesByTo
@@ -109,6 +119,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/tasks'
     | '/wellness'
+    | '/settings/calendar'
     | '/settings/fitness'
     | '/settings/integrations'
   id:
@@ -119,6 +130,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/tasks'
     | '/wellness'
+    | '/settings/calendar'
     | '/settings/fitness'
     | '/settings/integrations'
   fileRoutesById: FileRoutesById
@@ -130,6 +142,7 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRoute
   TasksRoute: typeof TasksRoute
   WellnessRoute: typeof WellnessRoute
+  SettingsCalendarRoute: typeof SettingsCalendarRoute
   SettingsFitnessRoute: typeof SettingsFitnessRoute
   SettingsIntegrationsRoute: typeof SettingsIntegrationsRoute
 }
@@ -192,6 +205,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsFitnessRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/calendar': {
+      id: '/settings/calendar'
+      path: '/settings/calendar'
+      fullPath: '/settings/calendar'
+      preLoaderRoute: typeof SettingsCalendarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -202,6 +222,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRoute,
   TasksRoute: TasksRoute,
   WellnessRoute: WellnessRoute,
+  SettingsCalendarRoute: SettingsCalendarRoute,
   SettingsFitnessRoute: SettingsFitnessRoute,
   SettingsIntegrationsRoute: SettingsIntegrationsRoute,
 }
