@@ -81,7 +81,7 @@ export function TaskDetailModal({ task, onClose, onSave, onDelete }: TaskDetailM
 
   // Filter available dependency tasks: active/draft tasks, not self, not already a dependency of self
   const availableDeps = allTasks.filter(
-    (t) => t.id !== task.id && t.status !== "completed" && t.status !== "snoozed"
+    (t) => t.id !== task.id && t.status !== "completed" && t.status !== "snoozed" && t.status !== "cancelled" && t.status !== "on_hold"
   );
   const filteredDeps = dependencySearch
     ? availableDeps.filter((t) => t.name.toLowerCase().includes(dependencySearch.toLowerCase()))
@@ -197,18 +197,34 @@ export function TaskDetailModal({ task, onClose, onSave, onDelete }: TaskDetailM
           {/* Status */}
           <div>
             <label className="mb-1 block text-sm font-medium text-brand-dark">Status</label>
-            <div className="flex gap-1.5">
-              {(["active", "draft", "completed", "snoozed"] as const).map((s) => (
+            <div className="grid grid-cols-3 gap-1.5">
+              {([
+                { value: "active", label: "Active", icon: "📋" },
+                { value: "draft", label: "Draft", icon: "📝" },
+                { value: "completed", label: "Done", icon: "✅" },
+                { value: "snoozed", label: "Snoozed", icon: "😴" },
+                { value: "on_hold", label: "On Hold", icon: "⏸️" },
+                { value: "cancelled", label: "Cancelled", icon: "❌" },
+              ] as const).map(({ value, label, icon }) => (
                 <button
-                  key={s}
-                  onClick={() => setStatus(s)}
-                  className={`flex-1 rounded-lg py-2 text-center text-xs font-medium capitalize transition-all ${
-                    status === s
-                      ? "bg-brand-deep text-white shadow-sm"
-                      : "bg-brand-cream/30 text-brand-muted hover:bg-brand-cream/50"
+                  key={value}
+                  onClick={() => setStatus(value)}
+                  className={`rounded-lg py-2 text-center text-xs font-medium transition-all ${
+                    status === value
+                      ? value === "cancelled"
+                        ? "bg-red-100 text-red-700 shadow-sm ring-1 ring-red-200"
+                        : value === "on_hold"
+                          ? "bg-amber-100 text-amber-700 shadow-sm ring-1 ring-amber-200"
+                          : "bg-brand-deep text-white shadow-sm"
+                      : value === "cancelled"
+                        ? "bg-red-50/30 text-red-400/60 hover:bg-red-50/60"
+                        : value === "on_hold"
+                          ? "bg-amber-50/30 text-amber-400/60 hover:bg-amber-50/60"
+                          : "bg-brand-cream/30 text-brand-muted hover:bg-brand-cream/50"
                   }`}
                 >
-                  {s}
+                  <span className="mr-0.5">{icon}</span>
+                  {label}
                 </button>
               ))}
             </div>

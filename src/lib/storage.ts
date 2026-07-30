@@ -19,7 +19,7 @@ export interface Task {
   startTime?: string;
   endTime?: string;
   priority: "low" | "medium" | "high";
-  status: "draft" | "active" | "completed" | "snoozed";
+  status: "draft" | "active" | "completed" | "snoozed" | "cancelled" | "on_hold";
   projectType: "personal" | "work" | "creative" | "health" | "errand";
   recurring: boolean;
   recurringPattern?: string;
@@ -272,11 +272,12 @@ export function generateId(): string {
 }
 
 // Check if a task is blocked by unmet dependencies
+// Cancelled deps do NOT block — they were an intentional withdrawal
 export function isTaskBlocked(task: Task, allTasks: Task[]): boolean {
   if (!task.dependencies || task.dependencies.length === 0) return false;
   return task.dependencies.some((depId) => {
     const dep = allTasks.find((t) => t.id === depId);
-    return !dep || dep.status !== "completed";
+    return !dep || (dep.status !== "completed" && dep.status !== "cancelled");
   });
 }
 
@@ -286,17 +287,17 @@ export function getBlockingTaskNames(task: Task, allTasks: Task[]): string[] {
   return task.dependencies
     .filter((depId) => {
       const dep = allTasks.find((t) => t.id === depId);
-      return !dep || dep.status !== "completed";
+      return !dep || (dep.status !== "completed" && dep.status !== "cancelled");
     })
     .map((depId) => allTasks.find((t) => t.id === depId)?.name || "Unknown task");
 }
 
-// Check if all dependencies are met (all completed)
+// Check if all dependencies are met (all completed or cancelled)
 export function areAllDepsCompleted(task: Task, allTasks: Task[]): boolean {
   if (!task.dependencies || task.dependencies.length === 0) return false;
   return task.dependencies.every((depId) => {
     const dep = allTasks.find((t) => t.id === depId);
-    return dep && dep.status === "completed";
+    return dep && (dep.status === "completed" || dep.status === "cancelled");
   });
 }
 

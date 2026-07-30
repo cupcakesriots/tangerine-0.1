@@ -149,21 +149,34 @@ function TasksPage() {
               const blocked = isTaskBlocked(task, tasks);
               const depsReady = !blocked && areAllDepsCompleted(task, tasks);
               const blockingNames = blocked ? getBlockingTaskNames(task, tasks) : [];
+              const isCancelled = task.status === "cancelled";
+              const isOnHold = task.status === "on_hold";
               return (
               <div
                 key={task.id}
-                className="card-elevated flex cursor-pointer items-start gap-3 slide-up transition-all hover:shadow-[0_8px_24px_-8px_rgba(194,105,1,0.15)] hover:-translate-y-0.5"
+                className={`card-elevated flex cursor-pointer items-start gap-3 slide-up transition-all hover:shadow-[0_8px_24px_-8px_rgba(194,105,1,0.15)] hover:-translate-y-0.5 ${isCancelled ? "opacity-50" : ""}`}
                 style={{ animationDelay: `${i * 30}ms` }}
                 onClick={() => setEditingTask(task)}
               >
                 <button onClick={(e) => { e.stopPropagation(); completeTask(task.id); }}
-                  className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all ${task.status === "completed" ? "border-brand-deep bg-brand-deep text-white" : "border-brand-cream/60 hover:border-brand-light"}`}>
+                  className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all ${task.status === "completed" ? "border-brand-deep bg-brand-deep text-white" : isCancelled ? "border-red-300/40 bg-red-50" : "border-brand-cream/60 hover:border-brand-light"}`}>
                   {task.status === "completed" && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M20 6L9 17l-5-5"/></svg>}
+                  {isCancelled && <span className="text-[8px]">✕</span>}
                 </button>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className={`text-sm font-medium ${task.status === "completed" ? "text-brand-muted line-through" : "text-brand-dark"}`}>{task.name}</span>
-                    {blocked && (
+                    <span className={`text-sm font-medium ${task.status === "completed" || isCancelled ? "text-brand-muted line-through" : "text-brand-dark"}`}>{task.name}</span>
+                    {isOnHold && (
+                      <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                        ⏸️ On Hold
+                      </span>
+                    )}
+                    {isCancelled && (
+                      <span className="inline-flex items-center gap-0.5 rounded-full bg-red-50 px-1.5 py-0.5 text-[10px] font-medium text-red-500">
+                        ❌ Cancelled
+                      </span>
+                    )}
+                    {blocked && !isCancelled && (
                       <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700" title={blockingNames.join(", ")}>
                         ⛓️ Blocked{blockingNames.length > 0 ? `: ${blockingNames[0]}` : ""}
                       </span>
@@ -192,7 +205,7 @@ function TasksPage() {
                   )}
                 </div>
                 <div className="flex shrink-0 gap-1" onClick={(e) => e.stopPropagation()}>
-                  {task.status !== "completed" && (<>
+                  {task.status !== "completed" && task.status !== "cancelled" && (<>
                     <button onClick={() => snoozeTask(task.id)} className="btn-ghost p-1.5 text-xs" title="Snooze">😴</button>
                     <button onClick={() => toggleActive(task.id, task.status)} className="btn-ghost p-1.5 text-xs" title="Toggle draft">{task.status === "draft" ? "📝" : "📄"}</button>
                   </>)}
@@ -205,17 +218,23 @@ function TasksPage() {
 
         {/* ===== KANBAN ===== */}
         {view === "kanban" && (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {(["active", "completed", "draft", "snoozed"] as const).map((status) => {
-              const statusTasks = tasks.filter((t) => t.status === status);
-              const icons: Record<string, string> = { active: "📋", completed: "✅", draft: "📝", snoozed: "😴" };
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {([
+              { key: "active", icon: "📋", label: "Active" },
+              { key: "completed", icon: "✅", label: "Done" },
+              { key: "draft", icon: "📝", label: "Draft" },
+              { key: "snoozed", icon: "😴", label: "Snoozed" },
+              { key: "on_hold", icon: "⏸️", label: "On Hold" },
+              { key: "cancelled", icon: "❌", label: "Cancelled" },
+            ] as const).map(({ key, icon, label }) => {
+              const statusTasks = tasks.filter((t) => t.status === key);
               return (
-                <div key={status} className="card-elevated">
+                <div key={key} className={`card-elevated ${key === "cancelled" ? "opacity-60" : key === "on_hold" ? "border-amber-200/40" : ""}`}>
                   <div className="mb-3 flex items-center justify-between">
-                    <h3 className="font-serif text-sm font-semibold capitalize text-brand-dark">{icons[status]} {status}</h3>
+                    <h3 className="font-serif text-sm font-semibold text-brand-dark">{icon} {label}</h3>
                     <span className="text-xs font-medium text-brand-muted/60">{statusTasks.length}</span>
                   </div>
-                  <div className="min-h-[120px] space-y-2">
+                  <div className="min-h-[80px] space-y-2">
                     {statusTasks.length === 0 ? (
                       <p className="py-4 text-center text-xs text-brand-muted/50">No tasks</p>
                     ) : (
@@ -223,7 +242,7 @@ function TasksPage() {
                         const blocked = isTaskBlocked(task, tasks);
                         const depsReady = !blocked && areAllDepsCompleted(task, tasks);
                         return (
-                        <div key={task.id} className="cursor-pointer rounded-xl bg-white/60 p-3 shadow-[0_1px_4px_-2px_rgba(0,0,0,0.02)] transition-all hover:shadow-[0_4px_12px_-4px_rgba(194,105,1,0.1)] hover:-translate-y-0.5" onClick={() => setEditingTask(task)}>
+                        <div key={task.id} className={`cursor-pointer rounded-xl bg-white/60 p-3 shadow-[0_1px_4px_-2px_rgba(0,0,0,0.02)] transition-all hover:shadow-[0_4px_12px_-4px_rgba(194,105,1,0.1)] hover:-translate-y-0.5 ${key === "cancelled" ? "opacity-50 line-through" : ""}`} onClick={() => setEditingTask(task)}>
                           <div className="mb-1.5 flex items-center gap-1.5">
                             <span className={`h-2 w-2 rounded-full ${blocked ? "bg-amber-400" : depsReady ? "bg-emerald-400" : task.priority === "high" ? "bg-red-400" : task.priority === "medium" ? "bg-amber-400" : "bg-emerald-400"}`} />
                             <span className="flex-1 truncate text-xs font-medium text-brand-dark">{task.name}</span>
@@ -259,7 +278,7 @@ function TasksPage() {
                 d.setDate(d.getDate() + i);
                 return d;
               });
-              const activeTasksList = tasks.filter((t) => t.status === "active" || t.status === "completed").slice(0, 8);
+              const activeTasksList = tasks.filter((t) => t.status === "active" || t.status === "completed" || t.status === "on_hold").slice(0, 8);
               return (
                 <div className="overflow-x-auto">
                   <div className="min-w-[600px]">
@@ -282,17 +301,19 @@ function TasksPage() {
                       const barWidth = task.priority === "high" ? 4 : task.priority === "medium" ? 3 : 2;
                       const blocked = isTaskBlocked(task, tasks);
                       const depsReady = !blocked && areAllDepsCompleted(task, tasks);
+                      const isOnHold = task.status === "on_hold";
                       return (
                         <div key={task.id} className="mb-2 flex cursor-pointer items-center border-b border-brand-cream/10 pb-2 transition-all hover:bg-brand-warm/20" onClick={() => setEditingTask(task)}>
-                          <div className="w-36 shrink-0 truncate pr-3 text-xs font-medium text-brand-dark">
-                            {blocked && <span className="mr-1 text-[8px]" title="Blocked">⛓️</span>}
+                          <div className={`w-36 shrink-0 truncate pr-3 text-xs font-medium ${isOnHold ? "text-amber-600 italic" : "text-brand-dark"}`}>
+                            {isOnHold && <span className="mr-1 text-[8px]">⏸</span>}
+                            {blocked && !isOnHold && <span className="mr-1 text-[8px]" title="Blocked">⛓️</span>}
                             {depsReady && <span className="mr-1 text-[8px]" title="Ready">🔓</span>}
                             {task.name}
                           </div>
                           {days.map((_, i) => (
                             <div key={i} className="flex-1 text-center">
                               {i >= startIdx && i < startIdx + barWidth && (
-                                <div className={`mx-0.5 h-5 rounded-full ${task.priority === "high" ? "bg-brand-deep/80" : task.priority === "medium" ? "bg-brand-light/70" : "bg-brand-yellow/60"}`} />
+                                <div className={`mx-0.5 h-5 rounded-full ${isOnHold ? "bg-amber-300/60" : task.priority === "high" ? "bg-brand-deep/80" : task.priority === "medium" ? "bg-brand-light/70" : "bg-brand-yellow/60"}`} />
                               )}
                             </div>
                           ))}
@@ -319,28 +340,33 @@ function TasksPage() {
             {filteredTasks.filter((t) => !(hideCompleted && t.status === "completed")).map((task) => {
               const blocked = isTaskBlocked(task, tasks);
               const depsReady = !blocked && areAllDepsCompleted(task, tasks);
+              const isCancelled = task.status === "cancelled";
+              const isOnHold = task.status === "on_hold";
               return (
-              <div key={task.id} className="card-elevated slide-up cursor-pointer transition-all hover:shadow-[0_8px_24px_-8px_rgba(194,105,1,0.15)] hover:-translate-y-0.5" onClick={() => setEditingTask(task)}>
+              <div key={task.id} className={`card-elevated slide-up cursor-pointer transition-all hover:shadow-[0_8px_24px_-8px_rgba(194,105,1,0.15)] hover:-translate-y-0.5 ${isCancelled ? "opacity-50" : ""}`} onClick={() => setEditingTask(task)}>
                 <div className="mb-2 flex items-start justify-between">
                   <div className="flex items-center gap-1.5">
                     <span className={`tag ${priorityColors[task.priority]}`}>{task.priority}</span>
-                    {blocked && <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">⛓️</span>}
+                    {isOnHold && <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">⏸️</span>}
+                    {isCancelled && <span className="rounded-full bg-red-50 px-1.5 py-0.5 text-[10px] font-medium text-red-500">❌</span>}
+                    {blocked && !isCancelled && <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">⛓️</span>}
                     {depsReady && <span className="rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">🔓</span>}
                     {task.dependencies && task.dependencies.length > 0 && (
                       <span className="text-[10px] text-brand-muted/50">🔗{task.dependencies.length}</span>
                     )}
                   </div>
                   <div className="flex gap-0.5" onClick={(e) => e.stopPropagation()}>
-                    {task.status !== "completed" && <button onClick={() => snoozeTask(task.id)} className="btn-ghost p-1 text-[10px]" title="Snooze">😴</button>}
+                    {task.status !== "completed" && task.status !== "cancelled" && <button onClick={() => snoozeTask(task.id)} className="btn-ghost p-1 text-[10px]" title="Snooze">😴</button>}
                     <button onClick={() => removeTask(task.id)} className="btn-ghost p-1 text-[10px] text-red-400" title="Delete">🗑️</button>
                   </div>
                 </div>
                 <div className="mb-1.5 flex items-center gap-2">
                   <button onClick={(e) => { e.stopPropagation(); completeTask(task.id); }}
-                    className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${task.status === "completed" ? "border-brand-deep bg-brand-deep" : "border-brand-cream/60 hover:border-brand-light"}`}>
+                    className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${task.status === "completed" ? "border-brand-deep bg-brand-deep" : isCancelled ? "border-red-300/40 bg-red-50" : "border-brand-cream/60 hover:border-brand-light"}`}>
                     {task.status === "completed" && <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><path d="M20 6L9 17l-5-5"/></svg>}
+                    {isCancelled && <span className="text-[6px] text-red-400">✕</span>}
                   </button>
-                  <span className={`text-sm font-medium ${task.status === "completed" ? "line-through text-brand-muted" : "text-brand-dark"}`}>{task.name}</span>
+                  <span className={`text-sm font-medium ${task.status === "completed" || isCancelled ? "line-through text-brand-muted" : "text-brand-dark"}`}>{isOnHold ? "⏸ " : ""}{task.name}</span>
                 </div>
                 {task.description && <p className="mb-2 text-xs text-brand-muted">{task.description}</p>}
                 <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-brand-muted/60">
@@ -371,15 +397,27 @@ function TasksPage() {
                   const blocked = isTaskBlocked(task, tasks);
                   const depsReady = !blocked && areAllDepsCompleted(task, tasks);
                   const blockingNames = blocked ? getBlockingTaskNames(task, tasks) : [];
+                  const isCancelled = task.status === "cancelled";
+                  const isOnHold = task.status === "on_hold";
                   return (
-                  <div key={task.id} className="relative flex gap-4 slide-up cursor-pointer" style={{ animationDelay: `${i * 50}ms` }} onClick={() => setEditingTask(task)}>
+                  <div key={task.id} className={`relative flex gap-4 slide-up cursor-pointer ${isCancelled ? "opacity-50" : ""}`} style={{ animationDelay: `${i * 50}ms` }} onClick={() => setEditingTask(task)}>
                     <div className="relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-white bg-white shadow-[0_2px_8px_-4px_rgba(194,105,1,0.2)]">
                       <span className="text-sm">{typeIcons[task.projectType]}</span>
                     </div>
-                    <div className="flex-1 rounded-xl bg-white/70 p-4 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.04)] transition-all hover:shadow-[0_4px_16px_-4px_rgba(194,105,1,0.12)]">
+                    <div className={`flex-1 rounded-xl bg-white/70 p-4 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.04)] transition-all hover:shadow-[0_4px_16px_-4px_rgba(194,105,1,0.12)]`}>
                       <div className="mb-1.5 flex flex-wrap items-center gap-2">
-                        <span className="text-sm font-medium text-brand-dark">{task.name}</span>
-                        {blocked && (
+                        <span className={`text-sm font-medium ${isCancelled ? "text-brand-muted line-through" : "text-brand-dark"}`}>{isOnHold ? "⏸ " : ""}{task.name}</span>
+                        {isOnHold && (
+                          <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                            ⏸️ On Hold
+                          </span>
+                        )}
+                        {isCancelled && (
+                          <span className="inline-flex items-center gap-0.5 rounded-full bg-red-50 px-1.5 py-0.5 text-[10px] font-medium text-red-500">
+                            ❌ Cancelled
+                          </span>
+                        )}
+                        {blocked && !isCancelled && (
                           <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700" title={blockingNames.join(", ")}>
                             ⛓️ Blocked{blockingNames.length > 0 ? `: ${blockingNames[0]}` : ""}
                           </span>
@@ -394,8 +432,8 @@ function TasksPage() {
                       </p>
                       {task.description && <p className="mt-1 text-xs text-brand-muted">{task.description}</p>}
                       <div className="mt-2 flex gap-2" onClick={(e) => e.stopPropagation()}>
-                        <button onClick={() => completeTask(task.id)} className="btn-ghost text-xs text-emerald-600 hover:text-emerald-700">✓ Complete</button>
-                        <button onClick={() => snoozeTask(task.id)} className="btn-ghost text-xs text-amber-600 hover:text-amber-700">😴 Snooze</button>
+                        {!isCancelled && <button onClick={() => completeTask(task.id)} className="btn-ghost text-xs text-emerald-600 hover:text-emerald-700">✓ Complete</button>}
+                        {!isCancelled && <button onClick={() => snoozeTask(task.id)} className="btn-ghost text-xs text-amber-600 hover:text-amber-700">😴 Snooze</button>}
                         <button onClick={() => removeTask(task.id)} className="btn-ghost text-xs text-red-400 hover:text-red-500">🗑️ Delete</button>
                       </div>
                     </div>
@@ -465,7 +503,7 @@ function AddTaskModal({ onClose, onSave }: { onClose: () => void; onSave: (task:
   };
 
   const availableDeps = allTasks.filter(
-    (t) => t.status !== "completed" && t.status !== "snoozed"
+    (t) => t.status !== "completed" && t.status !== "snoozed" && t.status !== "cancelled" && t.status !== "on_hold"
   );
   const filteredDeps = dependencySearch
     ? availableDeps.filter((t) => t.name.toLowerCase().includes(dependencySearch.toLowerCase()))
