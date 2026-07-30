@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { AppLayout } from "~/components/AppLayout";
 import { TaskDetailModal } from "~/components/TaskDetailModal";
-import { SmartSchedulingHint, GlobalSchedulingNudge } from "~/components/EnergyForecast";
+// EnergyForecast components available in premium-tier feature branch
 import {
   isOnboardingComplete,
   getTasks,
@@ -137,7 +137,6 @@ function TasksPage() {
         )}
 
         {/* ===== LIST ===== */}
-        <GlobalSchedulingNudge />
         {view === "list" && (filteredTasks.length === 0 ? (
           <div className="card-elevated py-12 text-center">
             <div className="mb-3 text-4xl">🎉</div>
@@ -173,7 +172,6 @@ function TasksPage() {
                     <span className={`tag ${priorityColors[task.priority]}`}>{task.priority}</span>
                     <span className="tag">{typeIcons[task.projectType]} {task.projectType}</span>
                     {task.energyRequired && <span className="tag">{'⚡'.repeat(task.energyRequired)}</span>}
-                    <SmartSchedulingHint taskId={task.id} />
                   </div>
                   {task.description && <p className="mt-1 text-xs text-brand-muted">{task.description}</p>}
                   <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-brand-muted">
