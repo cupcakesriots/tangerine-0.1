@@ -16,7 +16,7 @@ import { Route as CoachRouteImport } from './routes/coach'
 import { Route as CalendarRouteImport } from './routes/calendar'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SettingsIntegrationsRouteImport } from './routes/settings.integrations'
-import { Route as SettingsCalendarRouteImport } from './routes/settings.calendar'
+import { Route as SettingsFitnessRouteImport } from './routes/settings.fitness'
 
 const WellnessRoute = WellnessRouteImport.update({
   id: '/wellness',
@@ -53,9 +53,9 @@ const SettingsIntegrationsRoute = SettingsIntegrationsRouteImport.update({
   path: '/settings/integrations',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SettingsCalendarRoute = SettingsCalendarRouteImport.update({
-  id: '/settings/calendar',
-  path: '/settings/calendar',
+const SettingsFitnessRoute = SettingsFitnessRouteImport.update({
+  id: '/settings/fitness',
+  path: '/settings/fitness',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -66,7 +66,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRoute
   '/tasks': typeof TasksRoute
   '/wellness': typeof WellnessRoute
-  '/settings/calendar': typeof SettingsCalendarRoute
+  '/settings/fitness': typeof SettingsFitnessRoute
   '/settings/integrations': typeof SettingsIntegrationsRoute
 }
 export interface FileRoutesByTo {
@@ -76,7 +76,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardRoute
   '/tasks': typeof TasksRoute
   '/wellness': typeof WellnessRoute
-  '/settings/calendar': typeof SettingsCalendarRoute
+  '/settings/fitness': typeof SettingsFitnessRoute
   '/settings/integrations': typeof SettingsIntegrationsRoute
 }
 export interface FileRoutesById {
@@ -87,7 +87,7 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRoute
   '/tasks': typeof TasksRoute
   '/wellness': typeof WellnessRoute
-  '/settings/calendar': typeof SettingsCalendarRoute
+  '/settings/fitness': typeof SettingsFitnessRoute
   '/settings/integrations': typeof SettingsIntegrationsRoute
 }
 export interface FileRouteTypes {
@@ -99,7 +99,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/tasks'
     | '/wellness'
-    | '/settings/calendar'
+    | '/settings/fitness'
     | '/settings/integrations'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -109,7 +109,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/tasks'
     | '/wellness'
-    | '/settings/calendar'
+    | '/settings/fitness'
     | '/settings/integrations'
   id:
     | '__root__'
@@ -119,7 +119,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/tasks'
     | '/wellness'
-    | '/settings/calendar'
+    | '/settings/fitness'
     | '/settings/integrations'
   fileRoutesById: FileRoutesById
 }
@@ -130,7 +130,7 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRoute
   TasksRoute: typeof TasksRoute
   WellnessRoute: typeof WellnessRoute
-  SettingsCalendarRoute: typeof SettingsCalendarRoute
+  SettingsFitnessRoute: typeof SettingsFitnessRoute
   SettingsIntegrationsRoute: typeof SettingsIntegrationsRoute
 }
 
@@ -185,11 +185,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsIntegrationsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/settings/calendar': {
-      id: '/settings/calendar'
-      path: '/settings/calendar'
-      fullPath: '/settings/calendar'
-      preLoaderRoute: typeof SettingsCalendarRouteImport
+    '/settings/fitness': {
+      id: '/settings/fitness'
+      path: '/settings/fitness'
+      fullPath: '/settings/fitness'
+      preLoaderRoute: typeof SettingsFitnessRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -202,7 +202,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRoute,
   TasksRoute: TasksRoute,
   WellnessRoute: WellnessRoute,
-  SettingsCalendarRoute: SettingsCalendarRoute,
+  SettingsFitnessRoute: SettingsFitnessRoute,
   SettingsIntegrationsRoute: SettingsIntegrationsRoute,
 }
 export const routeTree = rootRouteImport

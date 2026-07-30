@@ -35,7 +35,6 @@ function DashboardPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const onboarding = getOnboarding();
 
-  // Re-read reactive data whenever refreshKey changes
   const [tasks, setTasks] = useState<Task[]>([]);
   const [todaysWellness, setTodaysWellness] = useState(getTodaysWellness());
   const [coachMsgs, setCoachMsgs] = useState(getCoachMessages());
@@ -45,7 +44,6 @@ function DashboardPage() {
       navigate({ to: "/", replace: true });
       return;
     }
-    // Refresh all data
     setTasks(getTasks());
     setTodaysWellness(getTodaysWellness());
     setCoachMsgs(getCoachMessages());
@@ -53,14 +51,12 @@ function DashboardPage() {
     setReady(true);
   }, [refreshKey]);
 
-  // Re-read on focus (handles user returning from tasks page)
   useEffect(() => {
     const handleFocus = () => setRefreshKey((k) => k + 1);
     window.addEventListener("focus", handleFocus);
     return () => window.removeEventListener("focus", handleFocus);
   }, []);
 
-  // Re-read on storage events (cross-tab sync)
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {
       if (e.key?.startsWith("tangerine_")) setRefreshKey((k) => k + 1);
@@ -79,15 +75,22 @@ function DashboardPage() {
     );
   }
 
+  const today = new Date();
+  const todayStr = today.toISOString().split("T")[0];
   const activeTasks = tasks.filter((t) => t.status === "active");
-  const todayTasks = activeTasks.filter(
-    (t) => t.date === new Date().toISOString().split("T")[0]
-  );
+  const todayTasks = activeTasks.filter((t) => t.date === todayStr);
   const highPriorityTasks = activeTasks.filter((t) => t.priority === "high");
-  const upcomingTasks = activeTasks.filter(
-    (t) => t.date !== new Date().toISOString().split("T")[0]
-  );
+  const upcomingTasks = activeTasks
+    .filter((t) => t.date > todayStr)
+    .sort((a, b) => a.date.localeCompare(b.date));
   const recentCoach = coachMsgs[coachMsgs.length - 1];
+
+  // Group upcoming tasks by date
+  const upcomingByDate = upcomingTasks.slice(0, 10).reduce<Record<string, Task[]>>((acc, task) => {
+    if (!acc[task.date]) acc[task.date] = [];
+    acc[task.date].push(task);
+    return acc;
+  }, {});
 
   return (
     <AppLayout>
@@ -106,6 +109,7 @@ function DashboardPage() {
             ) : "Log your current energy to get the most relevant suggestions for today."}
           </p>
         </div>
+
         {/* ===== INLINE ENERGY + MOOD CHECK-IN ===== */}
         <InlineEnergyMoodCheckin
           todaysWellness={todaysWellness}
@@ -118,7 +122,6 @@ function DashboardPage() {
               activities: [],
               notes: "",
             });
-            // Show curiosity prompt if Disinterested or Lost selected
             if (moods.includes("Disinterested") || moods.includes("Lost")) {
               setCuriosityEntry({ energy: energyLevel, moods });
             }
@@ -134,31 +137,19 @@ function DashboardPage() {
             <div className="h-px flex-1 bg-gradient-to-r from-brand-cream/40 to-transparent" />
           </div>
           <div className="flex flex-wrap gap-2.5">
-            <button
-              onClick={() => navigate({ to: "/tasks" })}
-              className="btn-action"
-            >
+            <button onClick={() => navigate({ to: "/tasks" })} className="btn-action">
               <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-brand-warm to-amber-50 text-sm shadow-sm">⚡</span>
               Quick Add Task
             </button>
-            <button
-              onClick={() => navigate({ to: "/wellness" })}
-              className="btn-action"
-            >
+            <button onClick={() => navigate({ to: "/wellness" })} className="btn-action">
               <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-pink-50 to-rose-50 text-sm shadow-sm">🌸</span>
               Log Energy
             </button>
-            <button
-              onClick={() => navigate({ to: "/coach" })}
-              className="btn-action"
-            >
+            <button onClick={() => navigate({ to: "/coach" })} className="btn-action">
               <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-amber-50 to-yellow-50 text-sm shadow-sm">🧩</span>
               Ask Coach (I'm Stuck)
             </button>
-            <button
-              onClick={() => navigate({ to: "/wellness" })}
-              className="btn-action"
-            >
+            <button onClick={() => navigate({ to: "/wellness" })} className="btn-action">
               <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-50 to-teal-50 text-sm shadow-sm">🧘</span>
               Start 5-Min Move & Stretch
             </button>
@@ -167,30 +158,93 @@ function DashboardPage() {
 
         {/* ===== MAIN GRID ===== */}
         <div className="grid gap-6 lg:grid-cols-3">
-          {/* ===== TODAY'S TASKS ===== */}
-          <div className="card-elevated col-span-2">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold tracking-tight text-brand-dark">Today's Tasks</h2>
-              <span className="text-xs font-medium text-brand-muted/60">{todayTasks.length} {todayTasks.length === 1 ? "task" : "tasks"}</span>
+          {/* ===== TASK LOOK-AHEAD: TODAY + UPCOMING ===== */}
+          <div className="col-span-2 space-y-6">
+            {/* TODAY CALLOUT — always visible, visually distinct */}
+            <div className="card-elevated overflow-hidden">
+              {/* Today header — prominent, accented */}
+              <div className="border-b border-brand-cream/30 bg-gradient-to-r from-brand-warm/40 to-brand-cream/20 px-5 py-4">
+                <div className="flex items-baseline justify-between">
+                  <div>
+                    <span className="text-xs font-medium uppercase tracking-wider text-brand-muted/60">Today</span>
+                    <h2 className="font-serif text-xl font-semibold text-brand-dark sm:text-2xl">
+                      {today.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+                    </h2>
+                  </div>
+                  <span className="rounded-full bg-brand-warm/60 px-3 py-1 text-xs font-medium text-brand-deep">
+                    {todayTasks.length} {todayTasks.length === 1 ? "task" : "tasks"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Today's tasks */}
+              <div className="px-5 py-3">
+                {todayTasks.length === 0 ? (
+                  <div className="flex flex-col items-center gap-3 py-6">
+                    <span className="text-3xl">🌿</span>
+                    <p className="text-sm font-medium text-brand-muted">Nothing scheduled for today — a clear day is a good day</p>
+                    <button onClick={() => navigate({ to: "/tasks" })} className="btn-ghost text-xs text-brand-deep">
+                      Add a task if you'd like →
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {todayTasks.map((task) => (
+                      <LookAheadTaskRow key={task.id} task={task} allTasks={tasks} onEdit={setEditingTask} />
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
-            {todayTasks.length === 0 ? (
-              <div className="flex flex-col items-center gap-2 py-8">
-                <span className="text-3xl">🎉</span>
-                <p className="text-sm font-medium text-brand-muted">No tasks today — enjoy the ease</p>
-                <button onClick={() => navigate({ to: "/tasks" })} className="btn-ghost text-xs text-brand-deep">
-                  Add a task →
-                </button>
+
+            {/* UPCOMING TASKS LOOK-AHEAD — grouped by date */}
+            {Object.keys(upcomingByDate).length > 0 ? (
+              <div className="card-elevated">
+                <div className="mb-4 flex items-center gap-2 border-b border-brand-cream/30 px-5 pt-4 pb-3">
+                  <span className="text-sm font-medium text-brand-muted/60">Upcoming</span>
+                  <div className="h-px flex-1 bg-gradient-to-r from-brand-cream/40 to-transparent" />
+                  <span className="text-xs text-brand-muted/50">{upcomingTasks.length} ahead</span>
+                </div>
+                <div className="space-y-4 px-5 pb-4">
+                  {Object.entries(upcomingByDate).map(([dateStr, dateTasks]) => {
+                    const date = new Date(dateStr + "T00:00:00");
+                    const dateLabel = getDateLabel(date);
+                    return (
+                      <div key={dateStr}>
+                        <div className="mb-2 flex items-center gap-2">
+                          <span className="font-serif text-sm font-medium text-brand-dark/70">
+                            {dateLabel}
+                          </span>
+                          <span className="text-xs text-brand-muted/50">
+                            {date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                          </span>
+                        </div>
+                        <div className="space-y-1">
+                          {dateTasks.map((task) => (
+                            <LookAheadTaskRow key={task.id} task={task} allTasks={tasks} onEdit={setEditingTask} isUpcoming />
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {upcomingTasks.length > 10 && (
+                  <div className="border-t border-brand-cream/30 px-5 py-3">
+                    <button onClick={() => navigate({ to: "/tasks" })} className="btn-ghost w-full text-sm text-brand-muted hover:text-brand-deep">
+                      View all {upcomingTasks.length} upcoming tasks →
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
-              <div className="space-y-2">
-                {todayTasks.map((task) => (
-                  <InlineTaskRow key={task.id} task={task} onEdit={setEditingTask} />
-                ))}
+              <div className="card-elevated">
+                <div className="flex flex-col items-center gap-3 py-8">
+                  <span className="text-2xl">🌤️</span>
+                  <p className="text-sm font-medium text-brand-muted">Your week is open</p>
+                  <p className="text-xs text-brand-muted/50">No upcoming tasks — enjoy the spaciousness</p>
+                </div>
               </div>
             )}
-            <button onClick={() => navigate({ to: "/tasks" })} className="btn-ghost mt-4 w-full text-sm text-brand-muted hover:text-brand-deep">
-              View all tasks →
-            </button>
           </div>
 
           {/* ===== RIGHT COLUMN ===== */}
@@ -239,6 +293,7 @@ function DashboardPage() {
               </div>
             </div>
           </div>
+        </div>
 
         {/* ===== HIGH PRIORITY ===== */}
         {highPriorityTasks.length > 0 && (
@@ -265,7 +320,7 @@ function DashboardPage() {
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-brand-dark">{task.name}</p>
                     <p className="text-xs text-brand-muted/60">
-                      {task.date === new Date().toISOString().split("T")[0] ? "Due today" : new Date(task.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                      {task.date === todayStr ? "Due today" : new Date(task.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
                       {blocked && blockingNames.length > 0 && (
                         <span className="ml-1.5 text-amber-600">· ⛓️ Blocked by: {blockingNames[0]}{blockingNames.length > 1 ? ` +${blockingNames.length - 1}` : ""}</span>
                       )}
@@ -278,41 +333,6 @@ function DashboardPage() {
                     <button onClick={() => { updateTask(task.id, { status: "completed" }); setReady(false); setTimeout(() => setReady(true), 100); }}
                       className="flex h-7 w-7 items-center justify-center rounded-full border border-brand-cream/40 text-xs text-brand-muted transition-all hover:border-brand-deep hover:text-brand-deep">✓</button>
                   </div>
-                </div>
-              )})}
-            </div>
-          </div>
-        )}
-
-        {/* ===== UPCOMING ===== */}
-        {upcomingTasks.length > 0 && (
-          <div>
-            <div className="mb-3 flex items-center gap-2">
-              <span className="text-sm font-medium text-brand-muted/60">Upcoming</span>
-              <div className="h-px flex-1 bg-gradient-to-r from-brand-cream/40 to-transparent" />
-            </div>
-            <div className="grid gap-2.5 sm:grid-cols-2">
-              {upcomingTasks.slice(0, 4).map((task) => {
-                const blocked = isTaskBlocked(task, tasks);
-                const depsReady = !blocked && areAllDepsCompleted(task, tasks);
-                const blockingNames = blocked ? getBlockingTaskNames(task, tasks) : [];
-                return (
-                <div
-                  key={task.id}
-                  className="card-elevated flex cursor-pointer items-center gap-3 py-3 transition-all hover:shadow-[0_4px_16px_-4px_rgba(194,105,1,0.1)] hover:-translate-y-0.5"
-                  onClick={() => setEditingTask(task)}
-                >
-                  <span className={`h-2 w-2 shrink-0 rounded-full ${blocked ? "bg-amber-400" : depsReady ? "bg-emerald-400" : task.priority === "high" ? "bg-red-400" : task.priority === "medium" ? "bg-amber-400" : "bg-emerald-400"}`} />
-                  <span className="flex-1 truncate text-sm text-brand-dark">
-                    {task.name}
-                    {blocked && <span className="ml-1.5 text-[10px] text-amber-500" title={`Blocked by: ${blockingNames.join(", ")}`}>⛓️</span>}
-                    {depsReady && <span className="ml-1.5 text-[10px] text-emerald-500" title="Dependencies completed">🔓</span>}
-                  </span>
-                  <span className="text-xs text-brand-muted/60">
-                    {new Date(task.date).toLocaleDateString("en-US", { weekday: "short", day: "numeric" })}
-                  </span>
-                  <button onClick={(e) => { e.stopPropagation(); setBlockerTask(task); }}
-                    className="flex h-6 w-6 items-center justify-center rounded-lg text-[10px] text-brand-muted/30 transition-all hover:bg-brand-cream/30 hover:text-brand-muted" title="Feeling blocked?">🧩</button>
                 </div>
               )})}
             </div>
@@ -375,6 +395,112 @@ function DashboardPage() {
   );
 }
 
+/* ===== LOOK-AHEAD TASK ROW ===== */
+function LookAheadTaskRow({
+  task,
+  allTasks,
+  onEdit,
+  isUpcoming = false,
+}: {
+  task: Task;
+  allTasks: Task[];
+  onEdit: (task: Task) => void;
+  isUpcoming?: boolean;
+}) {
+  const [completed, setCompleted] = useState(false);
+  const blocked = isTaskBlocked(task, allTasks);
+  const depsReady = !blocked && areAllDepsCompleted(task, allTasks);
+  const blockingNames = blocked ? getBlockingTaskNames(task, allTasks) : [];
+
+  return (
+    <div
+      className={`flex items-center gap-3 rounded-xl px-3.5 py-2.5 transition-all duration-200 cursor-pointer ${
+        completed ? "opacity-40" : isUpcoming ? "hover:bg-brand-warm/20" : "hover:bg-brand-warm/30"
+      }`}
+      onClick={() => onEdit(task)}
+    >
+      {/* Complete button */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          setCompleted(true);
+          import("~/lib/storage").then(({ updateTask }) => {
+            updateTask(task.id, { status: "completed" });
+          });
+        }}
+        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all ${
+          completed
+            ? "border-brand-deep bg-brand-deep text-white"
+            : "border-brand-cream/60 hover:border-brand-light"
+        }`}
+      >
+        {completed && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M20 6L9 17l-5-5"/></svg>}
+      </button>
+
+      {/* Task content */}
+      <span className={`flex-1 truncate text-sm ${completed ? "text-brand-muted line-through" : "text-brand-dark font-medium"}`}>
+        {task.name}
+      </span>
+
+      {/* Indicators */}
+      <div className="flex items-center gap-1.5 shrink-0">
+        {/* Dependency indicators */}
+        {blocked && (
+          <span className="text-xs text-amber-500" title={`Blocked by: ${blockingNames.join(", ")}`}>⛓️</span>
+        )}
+        {depsReady && (
+          <span className="text-xs text-emerald-500" title="Dependencies completed">🔓</span>
+        )}
+
+        {/* Effort level */}
+        {task.energyRequired && (
+          <span className="text-xs text-brand-muted/50">{'⚡'.repeat(task.energyRequired)}</span>
+        )}
+
+        {/* Snooze */}
+        {!isUpcoming && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              import("~/lib/storage").then(({ updateTask }) => {
+                updateTask(task.id, { status: "snoozed" });
+              });
+            }}
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-xs text-brand-muted/50 transition-all hover:bg-brand-cream/30 hover:text-brand-muted"
+            title="Snooze"
+          >
+            😴
+          </button>
+        )}
+
+        {/* Details */}
+        <button
+          onClick={(e) => { e.stopPropagation(); onEdit(task); }}
+          className="flex h-7 w-7 items-center justify-center rounded-lg text-xs text-brand-muted/30 transition-all hover:bg-brand-cream/30 hover:text-brand-muted"
+          title="Details"
+        >
+          ⋯
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ===== DATE LABEL HELPER ===== */
+function getDateLabel(date: Date): string {
+  const today = new Date();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
+
+  if (date.toDateString() === tomorrow.toDateString()) return "Tomorrow";
+
+  const diffDays = Math.round((date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays <= 7 && diffDays > 1) {
+    return date.toLocaleDateString("en-US", { weekday: "long" });
+  }
+  return date.toLocaleDateString("en-US", { weekday: "long" });
+}
+
 /* ===== INLINE ENERGY + MOOD CHECK-IN ===== */
 function InlineEnergyMoodCheckin({
   todaysWellness,
@@ -424,7 +550,6 @@ function InlineEnergyMoodCheckin({
         )}
       </div>
 
-      {/* Energy slider */}
       <div className="mb-4">
         <div className="mb-2 flex items-center justify-between">
           <span className="text-sm font-medium text-brand-dark">Energy level</span>
@@ -450,7 +575,6 @@ function InlineEnergyMoodCheckin({
         </div>
       </div>
 
-      {/* Mood multi-select */}
       <div className="mb-4">
         <p className="mb-2 text-sm font-medium text-brand-dark">Mood <span className="text-xs font-normal text-brand-muted">(pick all that fit)</span></p>
         <div className="flex flex-wrap gap-1.5">
@@ -476,68 +600,12 @@ function InlineEnergyMoodCheckin({
         )}
       </div>
 
-      {/* Save button */}
       <button
         onClick={() => { onCheckin(energyLevel, moods); setExpanded(false); }}
         className="btn-primary w-full"
       >
         {todaysWellness ? "✨ Update Check-in" : "🌿 Save Check-in"}
       </button>
-    </div>
-  );
-}
-
-/* ===== INLINE TASK ROW ===== */
-function InlineTaskRow({ task, onEdit }: { task: Task; onEdit: (task: Task) => void }) {
-  const [completed, setCompleted] = useState(false);
-
-  return (
-    <div
-      className={`flex items-center gap-3 rounded-xl px-3.5 py-2.5 transition-all duration-200 cursor-pointer ${
-        completed ? "opacity-50" : "hover:bg-brand-warm/30"
-      }`}
-      onClick={() => onEdit(task)}
-    >
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          setCompleted(true);
-          import("~/lib/storage").then(({ updateTask }) => {
-            updateTask(task.id, { status: "completed" });
-          });
-        }}
-        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all ${
-          completed
-            ? "border-brand-deep bg-brand-deep text-white"
-            : "border-brand-cream/60 hover:border-brand-light"
-        }`}
-      >
-        {completed && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M20 6L9 17l-5-5"/></svg>}
-      </button>
-      <span className={`flex-1 truncate text-sm ${completed ? "text-brand-muted line-through" : "text-brand-dark font-medium"}`}>
-        {task.name}
-      </span>
-      {task.energyRequired && (
-        <span className="text-xs text-brand-muted/50">{'⚡'.repeat(task.energyRequired)}</span>
-      )}
-      <div className="flex gap-0.5" onClick={(e) => e.stopPropagation()}>
-        <button
-          onClick={() => import("~/lib/storage").then(({ updateTask }) => {
-            updateTask(task.id, { status: "snoozed" });
-          })}
-          className="flex h-7 w-7 items-center justify-center rounded-lg text-xs text-brand-muted/50 transition-all hover:bg-brand-cream/30 hover:text-brand-muted"
-          title="Snooze"
-        >
-          😴
-        </button>
-        <button
-          onClick={() => onEdit(task)}
-          className="flex h-7 w-7 items-center justify-center rounded-lg text-xs text-brand-muted/30 transition-all hover:bg-brand-cream/30 hover:text-brand-muted"
-          title="Details"
-        >
-          ⋯
-        </button>
-      </div>
     </div>
   );
 }

@@ -1,4 +1,6 @@
 // Premium tier management stub — full implementation on feature/premium-gating-upgrade branch
+// This minimal stub unblocks the main branch build.
+
 import { useSyncExternalStore } from "react";
 
 export const PREMIUM_PAYMENT_URL = "#upgrade-placeholder";
@@ -36,6 +38,7 @@ export function usePremium(): PremiumState {
   const trialActive = useSyncExternalStore(subscribe, () => false);
   const trialDaysLeftVal = useSyncExternalStore(subscribe, () => null as number | null);
   const showBannerVal = useSyncExternalStore(subscribe, () => false);
+
   return {
     isPremium: isPremiumState,
     isTrialActive: trialActive,
