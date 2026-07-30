@@ -19,7 +19,7 @@ export interface Task {
   startTime?: string;
   endTime?: string;
   priority: "low" | "medium" | "high";
-  status: "draft" | "active" | "completed" | "snoozed";
+  status: "draft" | "active" | "completed" | "snoozed" | "cancelled" | "on_hold";
   projectType: "personal" | "work" | "creative" | "health" | "errand";
   recurring: boolean;
   recurringPattern?: string;
@@ -54,7 +54,7 @@ export interface CoachMessage {
   role: "user" | "coach";
   content: string;
   timestamp: string;
-  type: "chat" | "nudge" | "suggestion" | "cbt-card" | "subtask-breakdown" | "thought-reframe" | "breathing-guide" | "decision-tree" | "scenario-suggestion" | "dopamine-cold-start" | "burnout-boundary" | "clarity-checkin" | "focus-timer" | "task-reschedule" | "task-creator";
+  type: "chat" | "nudge" | "suggestion" | "cbt-card" | "subtask-breakdown" | "thought-reframe" | "breathing-guide" | "decision-tree" | "scenario-suggestion" | "dopamine-cold-start" | "burnout-boundary" | "clarity-checkin" | "focus-timer" | "task-reschedule" | "task-creator" | "smart-reschedule";
   data?: CoachInteractiveData;
 }
 
@@ -99,6 +99,22 @@ export interface CoachInteractiveData {
   parsedTasks?: { id: string; name: string; date: string; priority: "low" | "medium" | "high"; subtasks?: { id: string; name: string }[]; selected: boolean }[];
   createdCount?: number;
   createdTaskIds?: string[];
+  // Smart Reschedule
+  analyzedTasks?: SmartRescheduleTask[];
+  suggestedDestination?: "tomorrow" | "later-this-week" | "next-week" | "custom";
+}
+
+export interface SmartRescheduleTask {
+  id: string;
+  name: string;
+  priority: "low" | "medium" | "high";
+  effort: number; // 1-5 ⚡
+  isRecurring: boolean;
+  blocksOthers: boolean; // this task blocks other tasks
+  isBlocked: boolean; // this task is blocked by another
+  reason: string; // e.g. "low priority, no dependents, recurring"
+  keepReason?: string; // e.g. "high priority — should stay today"
+  selected: boolean;
 }
 
 export interface UserSettings {
@@ -248,6 +264,8 @@ export interface Integration {
 export function getIntegrations(): Integration[] {
   return getItem<Integration[]>(INTEGRATIONS_KEY, [
     { id: "google-cal", name: "Google Calendar", icon: "calendar", connected: true, lastSync: "2 min ago", description: "Sync your events and see your day at a glance." },
+    { id: "apple-cal", name: "Apple Calendar", icon: "apple-calendar", connected: false, description: "Connect your iCloud calendar to bring Apple Calendar events into Tangerine." },
+    { id: "outlook-cal", name: "Outlook Calendar", icon: "outlook-calendar", connected: false, description: "Sync your Microsoft Outlook and work calendar with your daily plan." },
     { id: "fitness", name: "Fitness Tracker", icon: "heart", connected: false, description: "Import step counts, heart rate, and activity data to inform your energy levels." },
     { id: "slack", name: "Slack", icon: "message-square", connected: false, description: "Get gentle nudges and daily planning prompts without leaving Slack." },
     { id: "zoom", name: "Zoom", icon: "video", connected: false, description: "Auto-detect meeting times and build focus blocks around them." },
@@ -272,11 +290,12 @@ export function generateId(): string {
 }
 
 // Check if a task is blocked by unmet dependencies
+// Cancelled deps do NOT block — they were an intentional withdrawal
 export function isTaskBlocked(task: Task, allTasks: Task[]): boolean {
   if (!task.dependencies || task.dependencies.length === 0) return false;
   return task.dependencies.some((depId) => {
     const dep = allTasks.find((t) => t.id === depId);
-    return !dep || dep.status !== "completed";
+    return !dep || (dep.status !== "completed" && dep.status !== "cancelled");
   });
 }
 
@@ -286,17 +305,17 @@ export function getBlockingTaskNames(task: Task, allTasks: Task[]): string[] {
   return task.dependencies
     .filter((depId) => {
       const dep = allTasks.find((t) => t.id === depId);
-      return !dep || dep.status !== "completed";
+      return !dep || (dep.status !== "completed" && dep.status !== "cancelled");
     })
     .map((depId) => allTasks.find((t) => t.id === depId)?.name || "Unknown task");
 }
 
-// Check if all dependencies are met (all completed)
+// Check if all dependencies are met (all completed or cancelled)
 export function areAllDepsCompleted(task: Task, allTasks: Task[]): boolean {
   if (!task.dependencies || task.dependencies.length === 0) return false;
   return task.dependencies.every((depId) => {
     const dep = allTasks.find((t) => t.id === depId);
-    return dep && dep.status === "completed";
+    return dep && (dep.status === "completed" || dep.status === "cancelled");
   });
 }
 

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "@tanstack/react-router";
-import { getTasks, updateTask, addTask, type CoachMessage } from "~/lib/storage";
+import { getTasks, updateTask, addTask, type CoachMessage, type SmartRescheduleTask } from "~/lib/storage";
 
 // ── Focus Timer Card ──
 export function FocusTimerCard({ msg, onResponse }: { msg: CoachMessage; onResponse: (text: string) => void }) {
@@ -384,6 +384,265 @@ export function TaskCreatorCard({ msg, onResponse }: { msg: CoachMessage; onResp
           Add {selectedCount} selected task{selectedCount !== 1 ? "s" : ""} to planner
         </button>
         <button onClick={() => onResponse("I'll add these manually, thanks.")} className="btn-ghost text-xs w-full">I'll add these later →</button>
+      </div>
+    </div>
+  );
+}
+
+// ── Smart Reschedule Card ──
+export function SmartRescheduleCard({ msg, onResponse }: { msg: CoachMessage; onResponse: (text: string) => void }) {
+  const analyzed = msg.data?.analyzedTasks || [];
+  const [tasks, setTasks] = useState<SmartRescheduleTask[]>(structuredClone(analyzed));
+  const [step, setStep] = useState<"review" | "destination" | "done">("review");
+  const [destination, setDestination] = useState<"tomorrow" | "later-this-week" | "next-week" | "custom">("tomorrow");
+  const [customDate, setCustomDate] = useState("");
+  const [changedTasks, setChangedTasks] = useState<{ id: string; name: string; newDate: string }[]>([]);
+
+  const today = new Date().toISOString().split("T")[0];
+
+  const toggleTask = (idx: number) => {
+    setTasks(prev => prev.map((t, i) => i === idx ? { ...t, selected: !t.selected } : t));
+  };
+
+  const selectedTasks = tasks.filter(t => t.selected);
+  const keptTasks = tasks.filter(t => !t.selected);
+  const hasDependencyWarnings = tasks.some(t => t.selected && t.blocksOthers);
+  const dependentTasksToMove = tasks.filter(t =>
+    t.isBlocked && tasks.some(s => s.selected && s.blocksOthers && s.id !== t.id)
+  );
+
+  // When selection changes, auto-select dependent tasks too
+  const finalSelected = [...selectedTasks];
+  dependentTasksToMove.forEach(t => {
+    if (!finalSelected.find(x => x.id === t.id)) {
+      finalSelected.push(t);
+    }
+  });
+
+  const resolveDate = (dest: typeof destination, custom: string): string => {
+    switch (dest) {
+      case "tomorrow": return new Date(Date.now() + 86400000).toISOString().split("T")[0];
+      case "later-this-week": {
+        const d = new Date();
+        const fridayOffset = 5 - d.getDay();
+        d.setDate(d.getDate() + Math.max(fridayOffset, 1));
+        return d.toISOString().split("T")[0];
+      }
+      case "next-week": return new Date(Date.now() + 86400000 * 7).toISOString().split("T")[0];
+      case "custom": return custom || today;
+      default: return today;
+    }
+  };
+
+  const applyReschedule = () => {
+    const newDate = resolveDate(destination, customDate);
+    const changed: typeof changedTasks = [];
+    finalSelected.forEach(t => {
+      updateTask(t.id, { date: newDate });
+      changed.push({ id: t.id, name: t.name, newDate });
+    });
+    setChangedTasks(changed);
+    setStep("done");
+  };
+
+  const undoAll = () => {
+    changedTasks.forEach(t => updateTask(t.id, { date: today }));
+    setStep("review");
+    setChangedTasks([]);
+  };
+
+  const priorityLabel = (p: string) =>
+    p === "high" ? "🔴 High" : p === "medium" ? "🟠 Medium" : "🟢 Low";
+
+  const destLabel = (d: typeof destination) => {
+    switch (d) {
+      case "tomorrow": return "Tomorrow";
+      case "later-this-week": return "Later this week";
+      case "next-week": return "Next week";
+      case "custom": return customDate ? new Date(customDate + "T12:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }) : "Pick a date";
+    }
+  };
+
+  if (step === "done") {
+    return (
+      <div className="max-w-[90%] rounded-xl bg-white shadow-sm ring-1 ring-brand-cream/30 overflow-hidden border border-brand-light/10 slide-up">
+        <div className="bg-gradient-to-r from-brand-leaf/40 to-emerald-100/30 px-4 py-3 flex items-center gap-2">
+          <span className="text-lg">✨</span>
+          <span className="font-serif text-sm font-semibold text-brand-deep tracking-tight">Day lightened</span>
+        </div>
+        <div className="p-5 space-y-4">
+          <div className="rounded-xl bg-brand-leaf/5 border border-brand-leaf/15 p-4">
+            <p className="text-sm font-medium text-brand-leaf mb-2">
+              {changedTasks.length} task{changedTasks.length !== 1 ? "s" : ""} moved — your day just opened up ✨
+            </p>
+            <div className="space-y-1">
+              {changedTasks.map(t => (
+                <p key={t.id} className="text-xs text-brand-dark flex items-center gap-2">
+                  <span className="text-brand-leaf">→</span>
+                  <span className="flex-1 truncate">{t.name}</span>
+                </p>
+              ))}
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={undoAll} className="btn-ghost text-xs">↩ Undo</button>
+            <button onClick={() => onResponse(`I moved ${changedTasks.length} task${changedTasks.length !== 1 ? "s" : ""}. My day feels so much lighter.`)}
+              className="btn-primary text-xs flex-1">Feels better ✨</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-[92%] rounded-xl bg-white shadow-sm ring-1 ring-brand-cream/30 overflow-hidden border border-brand-light/10">
+      <div className="bg-gradient-to-r from-brand-warm/60 to-brand-warm/20 px-4 py-3 flex items-center gap-2">
+        <span className="text-lg">📅</span>
+        <span className="font-serif text-sm font-semibold text-brand-deep tracking-tight">Let's find some breathing room</span>
+        <span className="ml-auto rounded-full bg-brand-deep/10 px-2 py-0.5 text-[10px] font-medium text-brand-deep">
+          {selectedTasks.length > 0 ? `${selectedTasks.length} selected` : `${tasks.length} tasks`}
+        </span>
+      </div>
+
+      <div className="p-5 space-y-4">
+        <p className="text-sm leading-relaxed text-brand-dark">{msg.content}</p>
+
+        {step === "review" && (
+          <>
+            {/* Tasks to consider moving */}
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {tasks.map((task, idx) => (
+                <label
+                  key={task.id}
+                  className={`flex items-start gap-3 rounded-lg p-3 transition-all cursor-pointer ${
+                    task.selected
+                      ? "bg-brand-warm/20 border border-brand-light/20"
+                      : "bg-brand-cream/10 border border-transparent hover:bg-brand-cream/20"
+                  } ${task.keepReason ? "opacity-70" : ""}`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={task.selected}
+                    onChange={() => toggleTask(idx)}
+                    className="mt-1 h-4 w-4 rounded accent-brand-deep cursor-pointer"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-medium text-brand-dark truncate">{task.name}</span>
+                      {task.priority === "high" && <span className="rounded-full bg-brand-rose/10 px-1.5 py-0.5 text-[10px] font-medium text-brand-rose">High</span>}
+                      {task.isRecurring && <span className="rounded-full bg-brand-cream/40 px-1.5 py-0.5 text-[10px] text-brand-muted">Recurring</span>}
+                      {task.blocksOthers && <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-600">⚠ Blocks</span>}
+                    </div>
+                    <p className="text-xs text-brand-muted mt-0.5">
+                      <span className="inline-flex items-center gap-0.5">
+                        {priorityLabel(task.priority)} · ⚡{task.effort}/5
+                      </span>
+                      <span className="ml-1.5 text-brand-muted/70">{task.reason}</span>
+                    </p>
+                    {task.keepReason && (
+                      <p className="text-[10px] text-brand-deep mt-0.5 italic">{task.keepReason}</p>
+                    )}
+                    {task.isBlocked && (
+                      <p className="text-[10px] text-brand-muted mt-0.5">Depends on another task</p>
+                    )}
+                  </div>
+                </label>
+              ))}
+            </div>
+
+            {/* Dependency warning */}
+            {hasDependencyWarnings && (
+              <div className="rounded-xl bg-amber-50/60 border border-amber-100 p-3">
+                <p className="text-xs text-amber-700 font-medium">⚠️ Some selected tasks block others</p>
+                <p className="text-xs text-amber-600 mt-0.5">
+                  The dependent tasks will be included automatically when you move the blocking task.
+                </p>
+              </div>
+            )}
+
+            {/* Keep summary */}
+            {keptTasks.length > 0 && selectedTasks.length > 0 && (
+              <div className="rounded-xl bg-brand-cream/30 p-3">
+                <p className="text-xs font-medium text-brand-dark mb-1">
+                  {keptTasks.length} task{keptTasks.length !== 1 ? "s" : ""} staying today:
+                </p>
+                {keptTasks.map(t => (
+                  <p key={t.id} className="text-xs text-brand-muted">· {t.name}</p>
+                ))}
+              </div>
+            )}
+
+            <button
+              onClick={() => setStep("destination")}
+              disabled={selectedTasks.length === 0}
+              className="btn-primary text-sm w-full disabled:opacity-40"
+            >
+              Choose where to move {selectedTasks.length || 0} task{selectedTasks.length !== 1 ? "s" : ""} →
+            </button>
+          </>
+        )}
+
+        {step === "destination" && (
+          <>
+            {/* Destination picker */}
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-brand-muted">Move to:</p>
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  { value: "tomorrow" as const, label: "Tomorrow", icon: "🌅", desc: "Fresh start" },
+                  { value: "later-this-week" as const, label: "Later this week", icon: "📆", desc: "By Friday" },
+                  { value: "next-week" as const, label: "Next week", icon: "🗓️", desc: "A full reset" },
+                  { value: "custom" as const, label: "Pick a date", icon: "📌", desc: "You choose" },
+                ]).map(d => (
+                  <button
+                    key={d.value}
+                    onClick={() => setDestination(d.value)}
+                    className={`rounded-xl border p-3 text-left transition-all ${
+                      destination === d.value
+                        ? "border-brand-deep bg-brand-warm/30 shadow-sm"
+                        : "border-brand-cream/30 bg-white hover:bg-brand-cream/10"
+                    }`}
+                  >
+                    <span className="text-lg">{d.icon}</span>
+                    <p className="text-sm font-medium text-brand-dark">{d.label}</p>
+                    <p className="text-xs text-brand-muted">{d.desc}</p>
+                  </button>
+                ))}
+              </div>
+
+              {destination === "custom" && (
+                <input
+                  type="date"
+                  value={customDate}
+                  onChange={e => setCustomDate(e.target.value)}
+                  min={new Date(Date.now() + 86400000).toISOString().split("T")[0]}
+                  className="input-field mt-1"
+                />
+              )}
+            </div>
+
+            {/* Summary of what will move */}
+            <div className="rounded-xl bg-brand-warm/20 p-3">
+              <p className="text-xs font-medium text-brand-dark mb-1">
+                Moving {finalSelected.length} task{finalSelected.length !== 1 ? "s" : ""} to {destLabel(destination)}:
+              </p>
+              {finalSelected.map(t => (
+                <p key={t.id} className="text-xs text-brand-muted">· {t.name}</p>
+              ))}
+            </div>
+
+            <div className="flex gap-2">
+              <button onClick={() => setStep("review")} className="btn-ghost text-sm">← Back</button>
+              <button onClick={applyReschedule} disabled={destination === "custom" && !customDate} className="btn-primary text-sm flex-1 disabled:opacity-40">
+                Move {finalSelected.length} task{finalSelected.length !== 1 ? "s" : ""} ✨
+              </button>
+            </div>
+          </>
+        )}
+
+        <button onClick={() => onResponse("I'll keep things as they are for now.")} className="btn-ghost text-xs w-full">
+          Keep as-is →
+        </button>
       </div>
     </div>
   );
