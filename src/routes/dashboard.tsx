@@ -1,10 +1,8 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { AppLayout } from "~/components/AppLayout"
 import { NectarMeter } from "~/components/NectarMeter";
 import { TaskDetailModal } from "~/components/TaskDetailModal";
-import { usePremium } from "~/lib/premium";
-import { EnergyForecastCard, WeeklyEnergyReport } from "~/components/EnergyForecast";
 import {
   isOnboardingComplete,
   getOnboarding,
@@ -36,7 +34,6 @@ function DashboardPage() {
   const [curiosityEntry, setCuriosityEntry] = useState<{ energy: number; moods: string[] } | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const onboarding = getOnboarding();
-  const premium = usePremium();
 
   // Re-read reactive data whenever refreshKey changes
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -109,26 +106,6 @@ function DashboardPage() {
             ) : "Log your current energy to get the most relevant suggestions for today."}
           </p>
         </div>
-
-        {/* ===== PREMIUM TRIAL BANNER ===== */}
-        {premium.showBanner && (
-          <div className="card-warm slide-up flex items-center justify-between gap-4 border border-brand-light/15 bg-gradient-to-r from-brand-warm/50 to-brand-cream/30">
-            <div className="flex items-center gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/60 text-sm shadow-sm">✨</span>
-              <div>
-                <p className="text-sm font-medium text-brand-dark">Try Premium free for {premium.trialDuration} days</p>
-                <p className="text-xs text-brand-muted">Unlock deeper coaching, calendar sync, and the full wellness library</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Link to="/upgrade" className="btn-primary shrink-0 text-xs">Explore Premium</Link>
-              <button onClick={() => premium.dismissBanner()} className="btn-ghost shrink-0 p-2 text-brand-muted/50 hover:text-brand-muted" title="Dismiss">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
-              </button>
-            </div>
-          </div>
-        )}
-
         {/* ===== INLINE ENERGY + MOOD CHECK-IN ===== */}
         <InlineEnergyMoodCheckin
           todaysWellness={todaysWellness}
@@ -261,28 +238,6 @@ function DashboardPage() {
                 </div>
               </div>
             </div>
-
-            {/* Energy Forecast (Premium) or Teaser */}
-            {premium.isPremium ? (
-              <EnergyForecastCard />
-            ) : (
-              <div className="card-elevated border-brand-light/15 bg-gradient-to-br from-brand-warm/20 to-white">
-                <div className="mb-3 flex items-center gap-2">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-deep/10 text-sm">📊</span>
-                  <span className="rounded-full bg-brand-gold/15 px-2 py-0.5 text-[10px] font-medium text-brand-deep">✨ Premium</span>
-                </div>
-                <h3 className="mb-2 font-serif text-base font-medium text-brand-dark">Energy Forecasting</h3>
-                <p className="mb-3 text-xs leading-relaxed text-brand-muted">
-                  See your energy patterns over time and get personalized suggestions for when to tackle different types of work.
-                </p>
-                <Link to="/upgrade" className="btn-secondary w-full text-xs">
-                  Unlock with Premium →
-                </Link>
-              </div>
-            )}
-          </div>
-        </div>
-
         {/* ===== HIGH PRIORITY ===== */}
         {highPriorityTasks.length > 0 && (
           <div>
@@ -368,9 +323,6 @@ function DashboardPage() {
             "Rest is not idle, and doing nothing is not a waste. You are not a machine."
           </p>
         </div>
-
-        {/* ===== WEEKLY REPORT ===== */}
-        {premium.isPremium && <WeeklyEnergyReport />}
 
         {/* ===== CURIOSITY PROMPT (Disinterested/Lost) ===== */}
         {curiosityEntry && (

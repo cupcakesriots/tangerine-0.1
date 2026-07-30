@@ -1,7 +1,6 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { AppLayout } from "~/components/AppLayout";
-import { usePremium } from "~/lib/premium";
 import {
   isOnboardingComplete,
   getIntegrations,
@@ -18,7 +17,6 @@ export const Route = createFileRoute("/settings/integrations")({
 
 function SettingsPage() {
   const navigate = useNavigate();
-  const premium = usePremium();
   const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [activeTab, setActiveTab] = useState<"integrations" | "preferences">("integrations");
@@ -130,15 +128,7 @@ function SettingsPage() {
                 </div>
 
                 {/* Toggle */}
-                {integration.icon === "calendar" && !premium.isPremium ? (
-                  <Link
-                    to="/upgrade"
-                    className="rounded-full bg-brand-warm/50 px-3 py-1 text-xs font-medium text-brand-deep transition-all hover:bg-brand-deep hover:text-white"
-                  >
-                    ✨ Premium
-                  </Link>
-                ) : (
-                  <button
+                <button
                     onClick={() => handleToggle(integration.id)}
                     className={`relative h-7 w-12 rounded-full transition-all ${
                       integration.connected ? "bg-brand-deep" : "bg-brand-cream/60"
@@ -151,7 +141,6 @@ function SettingsPage() {
                       }`}
                     />
                   </button>
-                )}
               </div>
             ))}
           </div>

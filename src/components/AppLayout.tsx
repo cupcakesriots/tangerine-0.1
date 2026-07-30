@@ -1,6 +1,5 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import { getOnboarding } from "~/lib/storage";
-import { usePremium } from "~/lib/premium";
 
 const navItems = [
   { href: "/dashboard", label: "Home", icon: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" },
@@ -14,7 +13,6 @@ const navItems = [
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const onboarding = getOnboarding();
-  const premium = usePremium();
   const name = onboarding?.name || null;
 
   return (
@@ -51,16 +49,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               </Link>
             );
           })}
-          {!premium.isPremium && (
-            <Link to="/upgrade"
-              className={`flex items-center gap-3.5 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-all duration-200 ${
-                location.pathname === "/upgrade"
-                  ? "bg-brand-warm/60 text-brand-deep shadow-[0_1px_4px_-2px_rgba(194,105,1,0.06)]"
-                  : "text-brand-muted hover:bg-white/50 hover:text-brand-dark"}`}>
-              <span className="flex h-[18px] w-[18px] items-center justify-center text-sm">✨</span>
-              Upgrade
-            </Link>
-          )}
         </nav>
         <div className="border-t border-white/30 px-6 py-4">
           <p className="text-xs font-medium text-brand-muted/40">Adaptive planning companion</p>
@@ -86,14 +74,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               </Link>
             );
           })}
-          {!premium.isPremium && (
-            <Link to="/upgrade"
-              className={`flex flex-col items-center gap-0.5 rounded-xl px-3 py-1.5 text-xs font-medium transition-all duration-200 ${
-                location.pathname === "/upgrade" ? "text-white drop-shadow" : "text-white/50"}`}>
-              <span className="text-lg">✨</span>
-              <span>Upgrade</span>
-            </Link>
-          )}
         </div>
       </nav>
     </div>

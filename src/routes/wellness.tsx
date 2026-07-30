@@ -1,9 +1,8 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { AppLayout } from "~/components/AppLayout"
 import { NectarMeter } from "~/components/NectarMeter";
 import { GuidedSession, type SessionType } from "~/components/wellness";
-import { usePremium } from "~/lib/premium";
 import {
   isOnboardingComplete,
   getWellnessEntries,
@@ -66,7 +65,7 @@ const activities: { type: ActivityType; emoji: string; title: string; duration: 
 
 // ── Premium guided sessions ──
 // First 2 are available to all; last 4 are premium-locked
-const premiumSessions: { type: SessionType; emoji: string; title: string; duration: string; description: string; gradient: string; premiumLocked: boolean }[] = [
+const premiumSessions: { type: SessionType; emoji: string; title: string; duration: string; description: string; gradient: string }[] = [
   {
     type: "box-breathing",
     emoji: "🫁",
@@ -74,7 +73,6 @@ const premiumSessions: { type: SessionType; emoji: string; title: string; durati
     duration: "3-7 min",
     description: "Animated breath pacing with expanding circle. Choose 3, 5, or 7 minutes of guided calm.",
     gradient: "from-blue-50/60 to-brand-cream/30",
-    premiumLocked: false,
   },
   {
     type: "desk-decompress",
@@ -83,7 +81,6 @@ const premiumSessions: { type: SessionType; emoji: string; title: string; durati
     duration: "5 min",
     description: "Guided chair yoga with illustrated pose cards. Neck rolls, twists, cat-cow — all from your seat.",
     gradient: "from-brand-warm/40 to-brand-cream/20",
-    premiumLocked: false,
   },
   {
     type: "somatic-grounding",
@@ -92,7 +89,6 @@ const premiumSessions: { type: SessionType; emoji: string; title: string; durati
     duration: "5-7 min",
     description: "Body scan meditation moving through eight regions. Progressive visual indicator with gentle cues.",
     gradient: "from-stone-100/50 to-brand-cream/30",
-    premiumLocked: true,
   },
   {
     type: "brain-dump",
@@ -101,7 +97,6 @@ const premiumSessions: { type: SessionType; emoji: string; title: string; durati
     duration: "3-5 min",
     description: "Externalize overwhelming thoughts in three phases: spill, reflect, and ceremonially release.",
     gradient: "from-brand-cream/40 to-brand-warm/30",
-    premiumLocked: true,
   },
   {
     type: "energy-reset",
@@ -110,7 +105,6 @@ const premiumSessions: { type: SessionType; emoji: string; title: string; durati
     duration: "2 min",
     description: "Quick physical shakeout, 30-sec breathing, and a gentle reframing thought for low-energy moments.",
     gradient: "from-amber-50/50 to-brand-warm/30",
-    premiumLocked: true,
   },
   {
     type: "evening-wind-down",
@@ -119,13 +113,11 @@ const premiumSessions: { type: SessionType; emoji: string; title: string; durati
     duration: "5 min",
     description: "Pre-sleep ritual with progressive relaxation, dimming screen overlay, and gratitude reflection.",
     gradient: "from-indigo-50/30 to-brand-cream/30",
-    premiumLocked: true,
   },
 ];
 
 function WellnessPage() {
   const navigate = useNavigate();
-  const premium = usePremium();
   const [ready, setReady] = useState(false);
   const [energyLevel, setEnergyLevel] = useState(3);
   const [moods, setMoods] = useState<string[]>([]);
@@ -367,7 +359,6 @@ function WellnessPage() {
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {premiumSessions.map((session) => {
-              const isLocked = session.premiumLocked && !premium.isPremium;
               return (
               <div
                 key={session.type}
@@ -376,26 +367,9 @@ function WellnessPage() {
                     ? "cursor-default opacity-70"
                     : "cursor-pointer hover:shadow-lg hover:-translate-y-0.5"
                 } bg-gradient-to-br ${session.gradient}`}
-                onClick={() => {
-                  if (isLocked) return;
-                  setActiveSession(session.type);
-                }}
+                onClick={() => setActiveSession(session.type)}
               >
-                {/* Premium lock overlay */}
-                {isLocked && (
-                  <div className="absolute inset-0 z-10 flex flex-col items-center justify-center rounded-2xl bg-white/60 backdrop-blur-[2px]">
-                    <span className="mb-1 text-2xl">✨</span>
-                    <span className="mb-2 text-xs font-medium text-brand-deep">Premium</span>
-                    <Link
-                      to="/upgrade"
-                      className="rounded-full bg-brand-deep px-4 py-1.5 text-xs font-medium text-white shadow-sm transition-all hover:bg-brand-dark"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      Unlock →
-                    </Link>
-                  </div>
-                )}
-                <div className="mb-2 flex items-center justify-between">
+                {/* Premium lock overlay */}<div className="mb-2 flex items-center justify-between">
                   <span className="text-2xl">{session.emoji}</span>
                   <span className="rounded-full bg-white/60 px-2 py-0.5 text-xs font-medium text-brand-deep">
                     {session.duration}
