@@ -10,22 +10,17 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as WellnessRouteImport } from './routes/wellness'
-import { Route as UpgradeRouteImport } from './routes/upgrade'
 import { Route as TasksRouteImport } from './routes/tasks'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CoachRouteImport } from './routes/coach'
 import { Route as CalendarRouteImport } from './routes/calendar'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SettingsIntegrationsRouteImport } from './routes/settings.integrations'
+import { Route as SettingsCalendarRouteImport } from './routes/settings.calendar'
 
 const WellnessRoute = WellnessRouteImport.update({
   id: '/wellness',
   path: '/wellness',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const UpgradeRoute = UpgradeRouteImport.update({
-  id: '/upgrade',
-  path: '/upgrade',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TasksRoute = TasksRouteImport.update({
@@ -58,6 +53,11 @@ const SettingsIntegrationsRoute = SettingsIntegrationsRouteImport.update({
   path: '/settings/integrations',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsCalendarRoute = SettingsCalendarRouteImport.update({
+  id: '/settings/calendar',
+  path: '/settings/calendar',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -65,8 +65,8 @@ export interface FileRoutesByFullPath {
   '/coach': typeof CoachRoute
   '/dashboard': typeof DashboardRoute
   '/tasks': typeof TasksRoute
-  '/upgrade': typeof UpgradeRoute
   '/wellness': typeof WellnessRoute
+  '/settings/calendar': typeof SettingsCalendarRoute
   '/settings/integrations': typeof SettingsIntegrationsRoute
 }
 export interface FileRoutesByTo {
@@ -75,8 +75,8 @@ export interface FileRoutesByTo {
   '/coach': typeof CoachRoute
   '/dashboard': typeof DashboardRoute
   '/tasks': typeof TasksRoute
-  '/upgrade': typeof UpgradeRoute
   '/wellness': typeof WellnessRoute
+  '/settings/calendar': typeof SettingsCalendarRoute
   '/settings/integrations': typeof SettingsIntegrationsRoute
 }
 export interface FileRoutesById {
@@ -86,8 +86,8 @@ export interface FileRoutesById {
   '/coach': typeof CoachRoute
   '/dashboard': typeof DashboardRoute
   '/tasks': typeof TasksRoute
-  '/upgrade': typeof UpgradeRoute
   '/wellness': typeof WellnessRoute
+  '/settings/calendar': typeof SettingsCalendarRoute
   '/settings/integrations': typeof SettingsIntegrationsRoute
 }
 export interface FileRouteTypes {
@@ -98,8 +98,8 @@ export interface FileRouteTypes {
     | '/coach'
     | '/dashboard'
     | '/tasks'
-    | '/upgrade'
     | '/wellness'
+    | '/settings/calendar'
     | '/settings/integrations'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -108,8 +108,8 @@ export interface FileRouteTypes {
     | '/coach'
     | '/dashboard'
     | '/tasks'
-    | '/upgrade'
     | '/wellness'
+    | '/settings/calendar'
     | '/settings/integrations'
   id:
     | '__root__'
@@ -118,8 +118,8 @@ export interface FileRouteTypes {
     | '/coach'
     | '/dashboard'
     | '/tasks'
-    | '/upgrade'
     | '/wellness'
+    | '/settings/calendar'
     | '/settings/integrations'
   fileRoutesById: FileRoutesById
 }
@@ -129,8 +129,8 @@ export interface RootRouteChildren {
   CoachRoute: typeof CoachRoute
   DashboardRoute: typeof DashboardRoute
   TasksRoute: typeof TasksRoute
-  UpgradeRoute: typeof UpgradeRoute
   WellnessRoute: typeof WellnessRoute
+  SettingsCalendarRoute: typeof SettingsCalendarRoute
   SettingsIntegrationsRoute: typeof SettingsIntegrationsRoute
 }
 
@@ -141,13 +141,6 @@ declare module '@tanstack/react-router' {
       path: '/wellness'
       fullPath: '/wellness'
       preLoaderRoute: typeof WellnessRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/upgrade': {
-      id: '/upgrade'
-      path: '/upgrade'
-      fullPath: '/upgrade'
-      preLoaderRoute: typeof UpgradeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/tasks': {
@@ -192,6 +185,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsIntegrationsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/calendar': {
+      id: '/settings/calendar'
+      path: '/settings/calendar'
+      fullPath: '/settings/calendar'
+      preLoaderRoute: typeof SettingsCalendarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -201,8 +201,8 @@ const rootRouteChildren: RootRouteChildren = {
   CoachRoute: CoachRoute,
   DashboardRoute: DashboardRoute,
   TasksRoute: TasksRoute,
-  UpgradeRoute: UpgradeRoute,
   WellnessRoute: WellnessRoute,
+  SettingsCalendarRoute: SettingsCalendarRoute,
   SettingsIntegrationsRoute: SettingsIntegrationsRoute,
 }
 export const routeTree = rootRouteImport

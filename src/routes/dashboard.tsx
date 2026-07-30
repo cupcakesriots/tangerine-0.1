@@ -238,6 +238,8 @@ function DashboardPage() {
                 </div>
               </div>
             </div>
+          </div>
+
         {/* ===== HIGH PRIORITY ===== */}
         {highPriorityTasks.length > 0 && (
           <div>
