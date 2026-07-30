@@ -53,3 +53,4 @@ export function usePremium(): PremiumState {
     paymentUrl: PREMIUM_PAYMENT_URL,
   };
 }
+// Premium tier gating feature branch
