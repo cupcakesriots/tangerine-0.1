@@ -30,7 +30,7 @@ function CalendarPage() {
       navigate({ to: "/", replace: true });
       return;
     }
-    setTasks(getTasks().filter((t) => t.status !== "draft"));
+    setTasks(getTasks().filter((t) => t.status !== "draft" && t.status !== "cancelled"));
     setReady(true);
   }, []);
 
@@ -115,13 +115,15 @@ function CalendarPage() {
                 {isToday(date) && <span className="ml-2 text-xs text-brand-deep">· Today</span>}
               </h3>
               <div className="space-y-1.5">
-                {dayTasks.map((task) => (
-                  <div key={task.id} className="flex items-center gap-2 rounded-lg bg-brand-cream/20 px-3 py-2">
-                    <span className={`h-2 w-2 shrink-0 rounded-full ${task.priority === "high" ? "bg-red-400" : task.priority === "medium" ? "bg-amber-400" : "bg-green-400"}`} />
-                    <span className="flex-1 text-sm text-brand-dark">{task.name}</span>
+                {dayTasks.map((task) => {
+                  const isOnHold = task.status === "on_hold";
+                  return (
+                  <div key={task.id} className={`flex items-center gap-2 rounded-lg bg-brand-cream/20 px-3 py-2 ${isOnHold ? "opacity-60" : ""}`}>
+                    <span className={`h-2 w-2 shrink-0 rounded-full ${isOnHold ? "bg-amber-300" : task.priority === "high" ? "bg-red-400" : task.priority === "medium" ? "bg-amber-400" : "bg-green-400"}`} />
+                    <span className={`flex-1 text-sm text-brand-dark ${isOnHold ? "italic" : ""}`}>{isOnHold ? "⏸ " : ""}{task.name}</span>
                     <span className="text-xs text-brand-muted">{task.projectType}</span>
                   </div>
-                ))}
+                )})}
               </div>
             </div>
           );
@@ -207,15 +209,17 @@ function CalendarPage() {
                     {getTasksForDate(date).length === 0 ? (
                       <p className="py-4 text-center text-sm text-brand-muted">A blank canvas day. What would feel good?</p>
                     ) : (
-                      getTasksForDate(date).map((task) => (
-                        <div key={task.id} className="flex items-center gap-3 rounded-xl border border-brand-cream/40 px-4 py-3">
-                          <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${task.priority === "high" ? "bg-red-400" : task.priority === "medium" ? "bg-amber-400" : "bg-green-400"}`} />
+                      getTasksForDate(date).map((task) => {
+                        const isOnHold = task.status === "on_hold";
+                        return (
+                        <div key={task.id} className={`flex items-center gap-3 rounded-xl border border-brand-cream/40 px-4 py-3 ${isOnHold ? "opacity-60" : ""}`}>
+                          <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${isOnHold ? "bg-amber-300" : task.priority === "high" ? "bg-red-400" : task.priority === "medium" ? "bg-amber-400" : "bg-green-400"}`} />
                           <div className="flex-1">
-                            <p className="text-sm font-medium text-brand-dark">{task.name}</p>
+                            <p className="text-sm font-medium text-brand-dark">{isOnHold ? "⏸ " : ""}{task.name}</p>
                             <p className="text-xs text-brand-muted">{task.projectType} · {task.energyRequired ? '⚡'.repeat(task.energyRequired) : ''}</p>
                           </div>
                         </div>
-                      ))
+                      )})
                     )}
                   </div>
                 </div>
@@ -237,20 +241,24 @@ function CalendarPage() {
                     </div>
                   </div>
                   <div className="space-y-1">
-                    {dayTasks.slice(0, 3).map((task) => (
+                    {dayTasks.slice(0, 3).map((task) => {
+                      const isOnHold = task.status === "on_hold";
+                      return (
                       <div
                         key={task.id}
                         className={`truncate rounded-md px-1.5 py-1 text-[10px] font-medium ${
-                          task.priority === "high"
-                            ? "bg-red-50 text-red-600"
-                            : task.priority === "medium"
-                              ? "bg-amber-50 text-amber-700"
-                              : "bg-green-50 text-green-700"
+                          isOnHold
+                            ? "bg-amber-50/50 text-amber-600/60 italic"
+                            : task.priority === "high"
+                              ? "bg-red-50 text-red-600"
+                              : task.priority === "medium"
+                                ? "bg-amber-50 text-amber-700"
+                                : "bg-green-50 text-green-700"
                         }`}
                       >
-                        {task.name}
+                        {isOnHold ? "⏸ " : ""}{task.name}
                       </div>
-                    ))}
+                    )})}
                     {dayTasks.length > 3 && (
                       <p className="text-center text-[10px] text-brand-muted">+{dayTasks.length - 3} more</p>
                     )}
@@ -290,28 +298,35 @@ function CalendarPage() {
                       {date.getDate()}
                     </div>
                     <div className="space-y-0.5">
-                      {dayTasks.slice(0, 2).map((task) => (
+                      {dayTasks.slice(0, 2).map((task) => {
+                        const isOnHold = task.status === "on_hold";
+                        return (
                         <div
                           key={task.id}
                           className="truncate rounded px-1 py-0.5 text-[10px] font-medium"
                           style={{
                             backgroundColor:
-                              task.priority === "high"
-                                ? "#fef2f2"
-                                : task.priority === "medium"
-                                  ? "#fffbeb"
-                                  : "#f0fdf4",
+                              isOnHold
+                                ? "#fffbeb"
+                                : task.priority === "high"
+                                  ? "#fef2f2"
+                                  : task.priority === "medium"
+                                    ? "#fffbeb"
+                                    : "#f0fdf4",
                             color:
-                              task.priority === "high"
-                                ? "#dc2626"
-                                : task.priority === "medium"
-                                  ? "#d97706"
-                                  : "#16a34a",
+                              isOnHold
+                                ? "#b45309"
+                                : task.priority === "high"
+                                  ? "#dc2626"
+                                  : task.priority === "medium"
+                                    ? "#d97706"
+                                    : "#16a34a",
+                            opacity: isOnHold ? 0.6 : 1,
                           }}
                         >
-                          {task.name}
+                          {isOnHold ? "⏸ " : ""}{task.name}
                         </div>
-                      ))}
+                      )})}
                       {dayTasks.length > 2 && (
                         <p className="text-center text-[9px] text-brand-muted">+{dayTasks.length - 2}</p>
                       )}
