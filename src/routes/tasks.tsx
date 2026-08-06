@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { AppLayout } from "~/components/AppLayout";
 import { TaskDetailModal } from "~/components/TaskDetailModal";
+import { FileImportModal } from "~/components/FileImportModal";
 // EnergyForecast components available in premium-tier feature branch
 import {
   isOnboardingComplete,
@@ -42,6 +43,7 @@ function TasksPage() {
   const [filter, setFilter] = useState<"all" | "active" | "completed">("active");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [hideCompleted, setHideCompleted] = useState(true);
   const [view, setView] = useState<ViewMode>("list");
@@ -93,10 +95,15 @@ function TasksPage() {
             <h1 className="text-2xl font-semibold text-brand-dark sm:text-3xl">Tasks</h1>
             <p className="text-sm text-brand-muted">{activeCount} active · {completedCount} completed</p>
           </div>
-          <button onClick={() => setShowAddModal(true)} className="btn-primary">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14"/></svg>
-            Add Task
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setShowImportModal(true)} className="btn-secondary text-xs">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+              Import</button>
+            <button onClick={() => setShowAddModal(true)} className="btn-primary">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14"/></svg>
+              Add Task
+            </button>
+          </div>
         </div>
 
         {/* View switcher */}
@@ -405,6 +412,14 @@ function TasksPage() {
           </div>
         ))}
       </div>
+
+      {/* Import Modal */}
+      {showImportModal && (
+        <FileImportModal
+          onClose={() => setShowImportModal(false)}
+          onImported={() => refresh()}
+        />
+      )}
 
       {/* Add Task Modal */}
       {showAddModal && (
